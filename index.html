@@ -6,17 +6,33 @@
   <title>Ankarlugn – lä för natten i Stockholms skärgård</title>
   <meta name="description" content="Hitta natthamn eller ankringsplats med bäst lä i Stockholms skärgård, för hela tiden du ligger där.">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <body>
   <header>
     <h1>Ankarlugn</h1>
     <p class="warning"><strong>Endast ett hjälpmedel.</strong> Sidan ersätter inte sjökort, egen bedömning och gott sjömanskap.
       Beräkningen bygger på en förenklad modell och kan ha fel. Djup, botten, grund, svall och trafik ingår inte.</p>
-    <form id="stay">
-      <label>Ankomst <input type="datetime-local" id="arrive" required></label>
-      <label>Avfärd <input type="datetime-local" id="depart" required></label>
-      <button type="submit">Visa lä</button>
+    <section class="when" aria-labelledby="when-title">
+      <div class="when-head">
+        <div>
+          <h2 id="when-title" class="when-label">Din vistelse</h2>
+          <p class="when-text"><span id="when-arrive">–</span> <span class="when-arrow" aria-hidden="true">→</span>
+            <span id="when-depart">–</span> <span id="when-len" class="pill"></span></p>
+        </div>
+      </div>
+      <div class="chips" role="group" aria-label="Snabbval">
+        <button type="button" class="chip" data-preset="tonight">I natt</button>
+        <button type="button" class="chip" data-preset="tomorrow">I morgon natt</button>
+        <button type="button" class="chip" data-preset="weekend">Helgen</button>
+        <button type="button" class="chip" data-preset="short">Några timmar</button>
+      </div>
+      <p id="tl-hint" class="tl-hint">Eller tryck på din ankomsttid i tidslinjen och sedan på avfärden.</p>
+      <div id="timeline" class="tl" role="group" aria-label="Tidslinje, en knapp per timme"></div>
+      <p class="tl-legend"><span id="tl-ref">Byvind</span> · <span class="wl w1"></span> svag <span class="wl w2"></span> måttlig
+        <span class="wl w3"></span> frisk <span class="wl w4"></span> hård</p>
+    </section>
+    <div class="filters">
       <button type="button" id="near" class="secondary">Nära mig</button>
       <label id="radius-label" hidden>Avstånd
         <select id="radius">
@@ -27,6 +43,13 @@
           <option value="0">alla</option>
         </select>
       </label>
+      <label>Båt
+        <select id="boat">
+          <option value="liten">under 8 m</option>
+          <option value="mellan" selected>8–12 m</option>
+          <option value="stor">över 12 m</option>
+        </select>
+      </label>
       <label>Visa
         <select id="kind">
           <option value="alla">alla platser</option>
@@ -34,7 +57,7 @@
           <option value="bad">stränder och vikar</option>
         </select>
       </label>
-    </form>
+    </div>
     <p id="status" role="status"></p>
   </header>
   <main>
@@ -53,6 +76,6 @@
       <a href="method.html">Så räknar sidan</a>.</p>
   </footer>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

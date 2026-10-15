@@ -20,6 +20,7 @@ Mer detaljer finns i [method.html](method.html).
 ```bash
 python3 scripts/build_profiles.py     # behövs bara när places.tsv ändras
 python3 -m unittest discover -s tests # test av stryklängdsberäkningen
+python3 scripts/validate_waves.py      # kontroll mot SMHI:s vågboj i Hårsfjärden
 python3 -m http.server 8000           # öppna http://localhost:8000
 ```
 

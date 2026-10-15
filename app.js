@@ -3,11 +3,21 @@
 // --- Inställningar för bedömningen (se method.html) ---
 const SMHI_URL = (lat, lon) =>
   `https://opendata-download-metfcst.smhi.se/api/category/snow1g/version/1/geotype/point/lon/${lon.toFixed(4)}/lat/${lat.toFixed(4)}/data.json`;
-const SPREAD_DEG = 10;          // vinden antas kunna vrida ±10° kring prognosen
-const WAVE_YELLOW = 0.2;        // m signifikant våghöjd: märkbar sjöhävning
-const WAVE_RED = 0.4;           // m: obekvämt eller riskabelt att ligga
-const GUST_YELLOW = 18;         // m/s byvind: kraftig vind även i lä
-const GUST_RED = 24;
+// Vinden antas kunna vrida ±10° kring prognosen det första dygnet, och mer ju längre fram
+// prognosen gäller (prognoser för vindriktning blir osäkrare med tiden), som mest ±30°.
+const SPREAD_MIN_DEG = 10;
+const SPREAD_PER_DAY_DEG = 7.5;
+const SPREAD_MAX_DEG = 30;
+// Gränser per båtstorlek: signifikant våghöjd (m) och byvind (m/s) för gult respektive rött.
+// Bedömningar, inte mätta värden: en mindre båt rör sig mer i samma sjö.
+const BOATS = {
+  liten:  { label: 'liten båt (under 8 m)',  waveY: 0.15, waveR: 0.3,  gustY: 15, gustR: 21 },
+  mellan: { label: 'mellanstor båt (8–12 m)', waveY: 0.2,  waveR: 0.4,  gustY: 18, gustR: 24 },
+  stor:   { label: 'stor båt (över 12 m)',   waveY: 0.3,  waveR: 0.55, gustY: 21, gustR: 27 },
+};
+// OSM:s färjeleder skiljer inte stora färjor från skärgårdsbåtar, så varningen gäller all linjetrafik.
+const FERRY_NEAR_M = 200;       // linjetrafik närmare än så: räkna med svall (märke i listan)
+const FERRY_SOME_M = 500;       // närmare än så: svall kan förekomma (bara text)
 const SHELTERED_M = 1000;       // stryklängd under detta räknas som skyddat håll
 const EXPOSED_M = 3000;         // stryklängd över detta räknas som öppet håll
 const TZ = 'Europe/Stockholm';
@@ -26,12 +36,23 @@ function compass(deg) {
   return COMPASS[Math.round(((deg % 360) + 360) % 360 / 22.5) % 16];
 }
 
-// Stryklängd i vindens riktning: största värdet inom ±SPREAD_DEG, eftersom vinden pendlar.
-function fetchFor(place, dirDeg) {
+function boat() {
+  const el = document.getElementById('boat');
+  return BOATS[el && el.value] || BOATS.mellan;
+}
+
+// Hur mycket vinden antas kunna vrida, beroende på hur långt fram i tiden timmen ligger.
+function spreadFor(t) {
+  const daysAhead = Math.max(0, (t - Date.now()) / 864e5 - 1);
+  return Math.min(SPREAD_MAX_DEG, SPREAD_MIN_DEG + SPREAD_PER_DAY_DEG * daysAhead);
+}
+
+// Stryklängd i vindens riktning: största värdet inom ±spread grader, eftersom vinden pendlar.
+function fetchFor(place, dirDeg, spread = SPREAD_MIN_DEG) {
   const n = place.fetch_m.length;
   const step = 360 / n;
   let worst = 0;
-  for (let d = dirDeg - SPREAD_DEG; d <= dirDeg + SPREAD_DEG; d += step / 2) {
+  for (let d = dirDeg - spread; d <= dirDeg + spread; d += step / 2) {
     const i = Math.round((((d % 360) + 360) % 360) / step) % n;
     worst = Math.max(worst, place.fetch_m[i]);
   }
@@ -44,14 +65,16 @@ function waveHeight(windMs, fetchM) {
 }
 
 function rateHour(place, h) {
-  const fetch = fetchFor(place, h.dir);
+  const b = boat();
+  const spread = spreadFor(h.t);
+  const fetch = fetchFor(place, h.dir, spread);
   const hs = waveHeight(h.wind, fetch);
-  let cls = hs >= WAVE_RED ? 'red' : hs >= WAVE_YELLOW ? 'yellow' : 'green';
-  if (h.gust >= GUST_RED) cls = 'red';
-  else if (h.gust >= GUST_YELLOW && cls === 'green') cls = 'yellow';
+  let cls = hs >= b.waveR ? 'red' : hs >= b.waveY ? 'yellow' : 'green';
+  if (h.gust >= b.gustR) cls = 'red';
+  else if (h.gust >= b.gustY && cls === 'green') cls = 'yellow';
   // Helt öppet mot havet: dyning kan komma in även i måttlig vind.
   if (fetch >= profiles.max_fetch_m && h.wind >= 6 && cls === 'green') cls = 'yellow';
-  return { ...h, fetch, hs, cls };
+  return { ...h, fetch, hs, cls, spread };
 }
 
 // Sammanhängande sektorer (cirkulärt) där pred(stryklängd) är sann, som text "SV–NV".
@@ -76,6 +99,15 @@ function sectors(place, pred) {
   }).filter((s, i, arr) => arr.indexOf(s) === i);
 }
 
+function ferryNote(place) {
+  const d = place.ferry_m;
+  if (d == null || d >= FERRY_SOME_M) return '';
+  const m = `${Math.round(d / 50) * 50} m`;
+  return d < FERRY_NEAR_M
+    ? `Linjetrafik passerar eller lägger till ${m} bort: räkna med svall, som modellen inte räknar med.`
+    : `Linjetrafik inom ${m}: svall kan förekomma.`;
+}
+
 function joinList(items) {
   if (items.length <= 1) return items.join('');
   return items.slice(0, -1).join(', ') + ' och ' + items[items.length - 1];
@@ -97,6 +129,9 @@ function describe(place, hours, worst) {
     parts.push(`Öppen mot ${joinList(open)} (upp till ${km(Math.max(...place.fetch_m))} km öppet vatten).`);
   }
 
+  const ferry = ferryNote(place);
+  if (ferry) parts.push(ferry);
+
   if (!hours.length) return parts.join(' ');
   if (worst.cls === 'green') {
     const dirs = [...new Set(hours.map(h => compass(h.dir)))];
@@ -105,7 +140,7 @@ function describe(place, hours, worst) {
     const first = hours.find(h => h.cls === worst.cls);
     const atStart = first === hours[0];
     const when = atStart ? 'redan vid ankomst' : `från ${fmtHour.format(first.t)}`;
-    const reason = first.hs >= WAVE_YELLOW
+    const reason = first.hs >= boat().waveY
       ? `${(first.fetch / 1000).toFixed(1).replace('.', ',')} km öppet vatten, ca ${first.hs.toFixed(1).replace('.', ',')} m sjö`
       : 'kraftiga byar';
     parts.push(`Utsatt när vinden kommer från ${compass(first.dir)}, vilket prognosen visar ${when} (${Math.round(first.wind)} m/s, byar ${Math.round(first.gust)} m/s; ${reason}).`);
@@ -187,7 +222,10 @@ function drawRays(place) {
 
 function setStatus(msg) { document.getElementById('status').textContent = msg; }
 
+let evalRun = 0;
+
 async function evaluate(arrive, depart) {
+  const run = ++evalRun;
   setStatus('Hämtar prognos från SMHI …');
   const results = await Promise.all(profiles.places.map(async place => {
     try {
@@ -207,8 +245,10 @@ async function evaluate(arrive, depart) {
     if (!a.worst || !b.worst) return (a.worst ? 0 : 1) - (b.worst ? 0 : 1);
     return LEVEL[a.worst.cls] - LEVEL[b.worst.cls] || a.worst.hs - b.worst.hs || a.worst.gust - b.worst.gust;
   });
+  if (run !== evalRun) return;   // ett nyare val har redan startat
   lastRun = { results, arrive, depart };
   render();
+  updateTimelineWind();
 }
 
 // Avstånd fågelvägen i km (haversine).
@@ -250,7 +290,8 @@ function render() {
     if (!visible) continue;
 
     const li = document.createElement('li');
-    li.innerHTML = `<span class="name">${r.place.name}</span> <span class="dot ${cls}"></span><br>
+    const swell = r.place.ferry_m != null && r.place.ferry_m < FERRY_NEAR_M ? ' <span class="badge" title="Linjetrafik nära">svall</span>' : '';
+    li.innerHTML = `<span class="name">${r.place.name}</span> <span class="dot ${cls}"></span>${swell}<br>
       <span class="why">${r.place.kind}${dist}. ${why}</span>${r.hours.length ? timeline(r.hours) : ''}`;
     li.addEventListener('click', () => { map.setView([r.place.lat, r.place.lon], 13); m.openPopup(); });
     list.appendChild(li);
@@ -287,6 +328,7 @@ function showMe(pos) {
   if (!renderedPos || distanceKm(renderedPos.lat, renderedPos.lon, myPos.lat, myPos.lon) > 0.2) {
     renderedPos = { ...myPos };
     render();
+    if (profiles) updateTimelineWind();
   }
 }
 
@@ -337,9 +379,139 @@ function locate() {
   }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }
 
-function toLocalInput(d) {
-  const p = n => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00`;
+// --- Tidsväljare: snabbval och tidslinje ---
+const HOUR = 3.6e6;
+const TL_DAYS = 5;
+const fmtDay = new Intl.DateTimeFormat('sv-SE', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ });
+const fmtWhen = new Intl.DateTimeFormat('sv-SE', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: TZ });
+const REF_PLACE_ID = 'n3053781982';   // Sandhamn: referens för vinden i tidslinjen
+let stay = null, pickingDepart = false;
+
+function hourFloor(d) { const x = new Date(d); x.setMinutes(0, 0, 0); return x; }
+function dayAt(base, addDays, hour) { const x = new Date(base); x.setDate(x.getDate() + addDays); x.setHours(hour, 0, 0, 0); return x; }
+function nextHour() { return hourFloor(new Date(Date.now() + HOUR)); }
+
+const PRESETS = {
+  tonight() {
+    const now = new Date();
+    const a = dayAt(now, 0, 18) > now ? dayAt(now, 0, 18) : nextHour();
+    return [a, dayAt(now, 1, 10)];
+  },
+  tomorrow() { const now = new Date(); return [dayAt(now, 1, 18), dayAt(now, 2, 10)]; },
+  weekend() {
+    const now = new Date(), dow = now.getDay();   // 0 = söndag
+    const inWeekend = dow === 6 || dow === 0 || (dow === 5 && now.getHours() >= 18);
+    const a = inWeekend ? nextHour() : dayAt(now, 5 - dow, 18);
+    let d = dayAt(a, (7 - a.getDay()) % 7, 15);
+    if (d - a < 4 * HOUR) d = new Date(a.getTime() + 6 * HOUR);
+    return [a, d];
+  },
+  short() { const a = nextHour(); return [a, new Date(a.getTime() + 4 * HOUR)]; },
+};
+
+function setStay(arrive, depart, preset = null) {
+  stay = { arrive, depart };
+  pickingDepart = false;
+  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.preset === preset)));
+  updateStayView();
+  scrollTimelineTo(arrive);
+  evaluate(arrive, depart);
+}
+
+function updateStayView() {
+  const { arrive, depart } = stay;
+  document.getElementById('when-arrive').textContent = fmtWhen.format(arrive);
+  document.getElementById('when-depart').textContent = pickingDepart ? 'välj avfärd' : fmtWhen.format(depart);
+  document.getElementById('when-len').textContent = pickingDepart ? '' : `${Math.round((depart - arrive) / HOUR)} h`;
+  document.getElementById('tl-hint').textContent = pickingDepart
+    ? 'Tryck nu på när du lämnar.'
+    : 'Eller tryck på din ankomsttid i tidslinjen och sedan på avfärden.';
+  for (const cell of document.querySelectorAll('.tl-cell')) {
+    const t = Number(cell.dataset.t);
+    const end = pickingDepart ? arrive.getTime() : depart.getTime();
+    cell.classList.toggle('in-range', t >= arrive.getTime() && t < end);
+    cell.classList.toggle('is-start', t === arrive.getTime());
+    cell.classList.toggle('is-end', !pickingDepart && t === depart.getTime() - HOUR);
+    cell.setAttribute('aria-pressed', String(t >= arrive.getTime() && t < end));
+  }
+}
+
+function buildTimeline() {
+  const tl = document.getElementById('timeline');
+  tl.innerHTML = '';
+  const start = hourFloor(new Date());
+  const end = dayAt(start, TL_DAYS, 0);
+  let dayEl = null, hoursEl = null, dayKey = '';
+  for (let t = start; t < end; t = new Date(t.getTime() + HOUR)) {
+    const key = fmtDay.format(t);
+    if (key !== dayKey) {
+      dayKey = key;
+      dayEl = document.createElement('div');
+      dayEl.className = 'tl-day';
+      dayEl.innerHTML = `<div class="tl-day-label">${key}</div>`;
+      hoursEl = document.createElement('div');
+      hoursEl.className = 'tl-hours';
+      dayEl.appendChild(hoursEl);
+      tl.appendChild(dayEl);
+    }
+    const h = Number(fmtClock.format(t));
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = 'tl-cell' + (h >= 21 || h < 6 ? ' night' : '');
+    cell.dataset.t = String(t.getTime());
+    cell.setAttribute('aria-label', `${key} klockan ${h}`);
+    cell.innerHTML = `<span class="tl-h">${String(h).padStart(2, '0')}</span><span class="tl-w"></span><span class="tl-bar"></span>`;
+    cell.addEventListener('click', () => pickHour(new Date(t)));
+    hoursEl.appendChild(cell);
+  }
+}
+
+function pickHour(t) {
+  if (!pickingDepart) {
+    stay = { arrive: t, depart: new Date(t.getTime() + HOUR) };
+    pickingDepart = true;
+    document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+    updateStayView();
+    return;
+  }
+  if (t < stay.arrive) {   // tryckte före ankomsten: börja om därifrån
+    stay = { arrive: t, depart: new Date(t.getTime() + HOUR) };
+    updateStayView();
+    return;
+  }
+  setStay(stay.arrive, new Date(t.getTime() + HOUR));
+}
+
+function scrollTimelineTo(t) {
+  const cell = document.querySelector(`.tl-cell[data-t="${hourFloor(t).getTime()}"]`);
+  const tl = document.getElementById('timeline');
+  if (!cell) return;
+  const left = tl.scrollLeft + cell.getBoundingClientRect().left - tl.getBoundingClientRect().left - tl.clientWidth / 4;
+  tl.scrollLeft = Math.max(0, left);
+}
+
+// Vindprognosen i tidslinjen, från närmaste plats (eller Sandhamn innan positionen är känd).
+async function updateTimelineWind() {
+  let ref = profiles.places.find(p => p.id === REF_PLACE_ID) || profiles.places[0];
+  if (myPos) {
+    ref = profiles.places.reduce((a, b) =>
+      distanceKm(myPos.lat, myPos.lon, a.lat, a.lon) <= distanceKm(myPos.lat, myPos.lon, b.lat, b.lon) ? a : b);
+  }
+  let series;
+  try { series = await loadForecast(ref); } catch { return; }
+  document.getElementById('tl-ref').textContent = `Byvind vid ${ref.name.split(',')[0]} (m/s)`;
+  for (const cell of document.querySelectorAll('.tl-cell')) {
+    const t = Number(cell.dataset.t);
+    let best = null;
+    for (const s of series) if (!best || Math.abs(s.t - t) < Math.abs(best.t - t)) best = s;
+    const w = cell.querySelector('.tl-w');
+    if (!best || Math.abs(best.t - t) > 3 * HOUR) { w.textContent = ''; cell.dataset.wind = ''; continue; }
+    const g = Math.round(best.gust);
+    // Pilen pekar dit vinden blåser.
+    w.innerHTML = `<span class="tl-arrow" style="transform: rotate(${best.dir + 180}deg)">↑</span>${g}`;
+    w.title = `${compass(best.dir)} ${Math.round(best.wind)} m/s, byar ${g} m/s`;
+    cell.dataset.wind = g < 8 ? '1' : g < 14 ? '2' : g < 20 ? '3' : '4';
+  }
 }
 
 async function init() {
@@ -366,20 +538,9 @@ async function init() {
       .on('popupclose', () => rayLayer.clearLayers());
   }
 
-  const now = new Date();
-  const arrive = new Date(now); arrive.setMinutes(0, 0, 0); arrive.setHours(arrive.getHours() + 1);
-  const depart = new Date(arrive); depart.setDate(depart.getDate() + 1); depart.setHours(10);
-  if (depart - arrive < 6 * 3.6e6) depart.setDate(depart.getDate() + 1);
-  document.getElementById('arrive').value = toLocalInput(arrive);
-  document.getElementById('depart').value = toLocalInput(depart);
-
-  document.getElementById('stay').addEventListener('submit', e => {
-    e.preventDefault();
-    const a = new Date(document.getElementById('arrive').value);
-    const d = new Date(document.getElementById('depart').value);
-    if (!(d > a)) { setStatus('Avfärden måste vara efter ankomsten.'); return; }
-    evaluate(a, d);
-  });
+  buildTimeline();
+  document.querySelectorAll('.chip').forEach(chip =>
+    chip.addEventListener('click', () => setStay(...PRESETS[chip.dataset.preset](), chip.dataset.preset)));
   document.getElementById('near').addEventListener('click', locate);
   document.getElementById('radius').addEventListener('change', () => {
     render();
@@ -389,13 +550,19 @@ async function init() {
     else map.fitBounds(L.latLngBounds(profiles.places.map(p => [p.lat, p.lon])).extend([myPos.lat, myPos.lon]), { padding: [20, 20] });
   });
   document.getElementById('kind').addEventListener('change', render);
+  const boatSel = document.getElementById('boat');
+  try { if (BOATS[localStorage.getItem('ankarlugn-boat')]) boatSel.value = localStorage.getItem('ankarlugn-boat'); } catch {}
+  boatSel.addEventListener('change', () => {
+    try { localStorage.setItem('ankarlugn-boat', boatSel.value); } catch {}
+    if (stay) evaluate(stay.arrive, stay.depart);
+  });
   // Har du redan gett sidan tillgång till din position visas den blå pricken direkt.
   if (navigator.permissions && navigator.geolocation) {
     navigator.permissions.query({ name: 'geolocation' })
       .then(st => { if (st.state === 'granted') locate(); })
       .catch(() => {});
   }
-  evaluate(arrive, depart);
+  setStay(...PRESETS.tonight(), 'tonight');
 }
 
 init().catch(e => setStatus(`Något gick fel: ${e.message}`));

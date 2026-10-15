@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ankarlugn – så räknar sidan</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <link rel="stylesheet" href="style.css?v=12">
   <style>body { display: block; } main { display: block; border: 0; max-width: 46rem; padding: 0 16px 24px; }</style>
 </head>
 <body>
@@ -23,15 +23,28 @@
       Resultatet finns i <code>data/profiles.json</code>. Klicka på en plats på kartan för att se mittstrålarna.</p>
 
     <h2>2. Prognosen timme för timme</h2>
-    <p>Sidan hämtar vindriktning, medelvind och byvind från SMHI:s öppna prognos för varje plats. För varje timme under
-      vistelsen används den största stryklängden inom ±10° från vindriktningen, eftersom vinden pendlar.
+    <p>Sidan hämtar vindriktning, medelvind och byvind från SMHI:s öppna prognos för varje plats.
       Ur medelvind <em>U</em> och stryklängd <em>F</em> uppskattas våghöjden med en vanlig formel för sjö som begränsas
       av stryklängden, JONSWAP: <em>H<sub>s</sub></em> = 0,0016 · <em>U</em> · √(<em>F</em>/<em>g</em>).</p>
-    <ul>
-      <li><strong>Grön</strong>: under 0,2 m sjö.</li>
-      <li><strong>Gul</strong>: 0,2–0,4 m sjö, byar över 18 m/s, eller helt öppet mot havet när det blåser minst 6 m/s.</li>
-      <li><strong>Röd</strong>: över 0,4 m sjö, eller byar över 24 m/s.</li>
-    </ul>
+    <p><strong>Osäker vindriktning.</strong> Vinden pendlar, och prognosen för vindriktningen blir osäkrare ju längre
+      fram den gäller. Därför används den största stryklängden inom ±10° från prognosens vindriktning under det första dygnet.
+      Därefter ökar marginalen jämnt med 7,5° per dygn, till exempel ±25° tre dygn fram, och blir som mest ±30°.</p>
+    <p><strong>Båtstorlek.</strong> En mindre båt rör sig mer i samma sjö. Gränserna nedan är bedömningar, inte mätta värden:</p>
+    <table class="val-table">
+      <thead><tr><th></th><th>Gul från</th><th>Röd från</th></tr></thead>
+      <tbody>
+        <tr><th>Under 8 m</th><td>0,15 m sjö eller byar 15 m/s</td><td>0,3 m sjö eller byar 21 m/s</td></tr>
+        <tr><th>8–12 m</th><td>0,2 m sjö eller byar 18 m/s</td><td>0,4 m sjö eller byar 24 m/s</td></tr>
+        <tr><th>Över 12 m</th><td>0,3 m sjö eller byar 21 m/s</td><td>0,55 m sjö eller byar 27 m/s</td></tr>
+      </tbody>
+    </table>
+    <p>En plats som är helt öppen mot havet blir dessutom minst gul när det blåser 6 m/s eller mer, eftersom dyning
+      kan komma in.</p>
+    <p><strong>Svall från båttrafik.</strong> Modellen räknar inte med svall. Sidan varnar därför när linjetrafik
+      (OpenStreetMap-taggen <code>route=ferry</code>) passerar eller lägger till närmare än 200 m från platsen, och nämner
+      det i texten om det är 200–500 m. Varningen ändrar inte färgen. OpenStreetMap skiljer inte stora färjor från
+      skärgårdsbåtar, och de stora färjornas leder, till exempel genom Furusund och förbi Sandhamn, saknas ofta.
+      Varningen är alltså ofullständig.</p>
 
     <h2>3. Rangordning efter sämsta timmen</h2>
     <p>Platserna sorteras efter sin sämsta timme under vistelsen, inte efter medelvärdet. En plats som är
@@ -47,10 +60,31 @@
     <p>Knappen <em>Nära mig</em> använder telefonens eller datorns position. Positionen lämnar aldrig webbläsaren.
       Avståndet räknas fågelvägen, så sjövägen kan vara betydligt längre runt öar och grund.</p>
 
+    <h2 id="kontroll">Kontroll mot en riktig vågboj</h2>
+    <p>För att kontrollera modellen mot verkligheten används SMHI:s vågboj i Hårsfjärden, som mätte våghöjden
+      13 april–14 maj 2015. Den låg i en skyddad del av skärgården, alltså samma slags vatten som sidan bedömer.
+      För varje timme räknas våghöjden ut med exakt samma metod som sidan, ur uppmätt vind, och jämförs med bojens mätning.
+      Vinden tas från två stationer: Berga, 3,5 km från bojen men på land, och Landsort A, ute till havs 35 km bort.
+      Skriptet är <code>scripts/validate_waves.py</code>.</p>
+    <p><strong>Vad kontrollen visar:</strong></p>
+    <ul>
+      <li><strong>Formeln ger rätt storlek på sjön i genomsnitt.</strong> Med vind från Berga hamnar beräkningen i snitt
+        bara några millimeter fel, och det typiska felet är cirka 6 cm.</li>
+      <li><strong>Men vilken vind modellen får avgör färgerna.</strong> Med Bergas vind, som är svagare eftersom den mäts på
+        land, missar modellen alla timmar som egentligen var gula. Med Landsorts havsvind fångas ungefär hälften av
+        dem, men modellen varnar också för ofta.</li>
+      <li><strong>Sidan använder SMHI:s prognos för vinden över vattnet</strong>, som oftast ligger närmare havsvinden.
+        Då är felen oftast åt det försiktiga hållet, men gula timmar kan fortfarande visas som gröna.</li>
+      <li><strong>Underlaget är litet:</strong> en boj under en månad, med få timmar med riktigt hård vind.
+        Bara en timme var röd, så gränsen för rött är i praktiken inte prövad.</li>
+    </ul>
+    <div id="validation"></div>
+
     <h2>Källor</h2>
     <p>Platser och kustlinje: © OpenStreetMap-bidragsgivare, ODbL (taggarna <code>seamark:type=anchorage</code>,
-      <code>leisure=marina</code> och <code>natural=coastline</code>). Prognos: SMHI öppna data, CC BY 4.0.
+      <code>leisure=marina</code> och <code>natural=coastline</code>). Prognos, vind- och vågmätningar: SMHI öppna data, CC BY 4.0.
       Inga uppgifter är hämtade från hamnguider.</p>
   </main>
+  <script src="validation.js?v=2"></script>
 </body>
 </html>

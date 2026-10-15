@@ -23,8 +23,14 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 CACHE = os.path.join(ROOT, "cache")
 STEP_DEG = 10
 MAX_FETCH = 20000.0
-# Område för kustlinjen (syd, väst, nord, öst): Stockholms skärgård med 20 km marginal.
-COAST_BBOX = (58.77, 17.929, 60.063, 19.715)
+# Områden för kustlinjen (syd, väst, nord, öst) med 20 km marginal runt platserna. Det första är
+# den ursprungliga skärgården; de andra lades till för södra skärgården (Rånö–Torö–Landsort).
+# Nya områden läggs till i stället för att ändra gamla, så att cachade rutor kan återanvändas.
+COAST_BBOXES = [
+    (58.77, 17.929, 60.063, 19.715),
+    (58.55, 17.4, 58.77, 18.929),
+    (58.77, 17.4, 59.27, 17.929),
+]
 ENDPOINTS = ["https://overpass-api.de/api/interpreter"]
 USER_AGENT = "ankarlugn/1.0 (+https://github.com/OliverDahlgren/ankarlugn)"
 
@@ -149,6 +155,26 @@ def fetch_coastline(south, west, north, east, tile=0.25):
     return ways
 
 
+def fetch_ferry_routes():
+    """Färjeleder (route=ferry) i hela området, för varning om svall från färjetrafik."""
+    s = min(b[0] for b in COAST_BBOXES)
+    w = min(b[1] for b in COAST_BBOXES)
+    n = max(b[2] for b in COAST_BBOXES)
+    e = max(b[3] for b in COAST_BBOXES)
+    q = f'[out:json][timeout:180];way["route"="ferry"]({s},{w},{n},{e});out geom tags;'
+    data = cached(f"ferries_{s}_{w}_{n}_{e}.json", lambda: overpass(q))
+    return [w["geometry"] for w in data["elements"] if "geometry" in w]
+
+
+def point_segment_distance(p, a, b):
+    ax, ay = a
+    bx, by = b
+    dx, dy = bx - ax, by - ay
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / L2))
+    return math.hypot(p[0] - (ax + t * dx), p[1] - (ay + t * dy))
+
+
 def main():
     rows = read_places()
     print(f"Hämtar {len(rows)} platser från OpenStreetMap")
@@ -159,12 +185,17 @@ def main():
     proj = Projector(sum(lats) / len(lats), sum(lons) / len(lons))
     pad_lat = MAX_FETCH / 111000
     pad_lon = pad_lat / math.cos(math.radians(proj.lat0))
-    s, w, n, e = COAST_BBOX
-    if min(lats) - pad_lat < s or max(lats) + pad_lat > n or min(lons) - pad_lon < w or max(lons) + pad_lon > e:
-        print("  VARNING: någon plats ligger nära kanten av COAST_BBOX; stryklängden kan bli för lång där",
-              file=sys.stderr)
+    def covered(lat, lon):
+        return any(s <= lat <= n and w <= lon <= e for s, w, n, e in COAST_BBOXES)
+    for lat, lon in zip(lats, lons):
+        corners = [(lat + a * pad_lat, lon + b * pad_lon) for a in (-1, 1) for b in (-1, 1)]
+        if not all(covered(*c) for c in corners):
+            print(f"  VARNING: kustlinjen täcker inte 20 km runt ({lat:.3f}, {lon:.3f}); lägg till ett område i COAST_BBOXES",
+                  file=sys.stderr)
     print("Hämtar kustlinje")
-    ways = fetch_coastline(*COAST_BBOX)
+    ways = {}
+    for bbox in COAST_BBOXES:
+        ways.update(fetch_coastline(*bbox))
 
     segments = []
     for geom in ways.values():
@@ -172,6 +203,13 @@ def main():
         segments.extend(zip(pts, pts[1:]))
     print(f"{len(ways)} kustlinjer, {len(segments)} segment")
     index = CoastIndex(segments, cell=250.0)
+
+    print("Hämtar färjeleder")
+    ferry_segments = []
+    for geom in fetch_ferry_routes():
+        pts = [proj.to_xy(g["lat"], g["lon"]) for g in geom]
+        ferry_segments.extend(zip(pts, pts[1:]))
+    print(f"{len(ferry_segments)} segment av färjeleder")
 
     out = []
     for p in places:
@@ -188,6 +226,7 @@ def main():
             "lat": round(lat, 6), "lon": round(lon, 6), "moved_m": round(moved),
             "fetch_m": [round(d) for d in prof],
             "ray_m": [round(d) for d in rays],
+            "ferry_m": round(min((point_segment_distance(q, a, b) for a, b in ferry_segments), default=1e9)),
         })
 
     result = {
