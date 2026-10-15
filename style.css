@@ -98,35 +98,23 @@ h2 { font-size: 1rem; margin: 0 0 8px; }
 }
 .chip:hover { border-color: var(--accent); }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
-.tl-hint { margin: 10px 0 6px; font-size: .8rem; color: var(--muted); }
-.tl {
-  display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px;
-  -webkit-overflow-scrolling: touch;
+.when-edit { display: grid; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.when-row { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "label stepper" "days days"; align-items: center; gap: 6px 10px; }
+.when-row-label { grid-area: label; font-size: .8rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+.day-chips { grid-area: days; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.day-chips::-webkit-scrollbar { display: none; }
+.day-chip {
+  flex: none; min-height: 40px; padding: 6px 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); font-weight: 600; font-size: .85rem;
 }
-.tl-day { flex: none; }
-.tl-day-label { position: sticky; left: 0; width: max-content; padding-right: 8px; font-size: .75rem; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
-.tl-day-label::first-letter { text-transform: uppercase; }
-.tl-hours { display: flex; gap: 2px; }
-.tl-cell {
-  position: relative; display: flex; flex-direction: column; align-items: center; justify-content: space-between;
-  width: 36px; height: 58px; padding: 5px 0 8px; border-radius: 8px; border: 0;
-  background: var(--bg); color: var(--fg); font-size: .72rem; cursor: pointer;
-}
-.tl-cell.night { background: color-mix(in srgb, var(--fg) 7%, var(--bg)); }
-.tl-cell.in-range { background: color-mix(in srgb, var(--accent) 40%, var(--bg)); }
-.tl-cell.is-start, .tl-cell.is-end { background: var(--accent); color: var(--on-accent); }
-.tl-cell:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.tl-h { font-weight: 600; }
-.tl-w { font-size: .68rem; color: var(--muted); white-space: nowrap; }
-.tl-cell.is-start .tl-w, .tl-cell.is-end .tl-w { color: var(--on-accent); }
-.tl-arrow { display: inline-block; font-size: .7rem; line-height: 1; margin-right: 1px; }
-.tl-bar { position: absolute; left: 6px; right: 6px; bottom: 2px; height: 3px; border-radius: 2px; background: transparent; }
-.tl-cell[data-wind="1"] .tl-bar, .wl.w1 { background: #9ecae1; }
-.tl-cell[data-wind="2"] .tl-bar, .wl.w2 { background: #4292c6; }
-.tl-cell[data-wind="3"] .tl-bar, .wl.w3 { background: var(--yellow); }
-.tl-cell[data-wind="4"] .tl-bar, .wl.w4 { background: var(--red); }
-.tl-legend { margin: 4px 0 0; font-size: .72rem; color: var(--muted); }
-.wl { display: inline-block; width: 12px; height: 3px; border-radius: 2px; vertical-align: middle; margin: 0 2px 0 6px; }
+.day-chip::first-letter { text-transform: uppercase; }
+.day-chip[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.day-chip:disabled { opacity: .35; cursor: default; }
+.stepper { grid-area: stepper; display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); overflow: hidden; }
+.stepper button { width: 44px; height: 40px; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--accent); font-size: 1.35rem; font-weight: 600; line-height: 1; }
+.stepper button:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.stepper button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.stepper output { min-width: 64px; text-align: center; font-size: 1.1rem; font-weight: 650; font-variant-numeric: tabular-nums; }
 label { display: flex; flex-direction: column; font-size: 0.85rem; color: var(--muted); }
 input, button, select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }
 button { background: var(--accent); color: var(--on-accent); border: 0; cursor: pointer; }

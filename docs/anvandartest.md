@@ -23,7 +23,7 @@ Läs upp en uppgift i taget. Starta klockan när du har läst klart.
 |---|---|---|
 | 1 | "Du ska ligga för ankar i natt. Vilken plats rekommenderar sidan?" | pekar på platsen överst i *Bäst för i natt* |
 | 2 | "Varför är den platsen bra i natt, och vad händer om vinden vrider?" | har öppnat platsen och förklarar med egna ord utifrån texten, märkena eller diagrammet |
-| 3 | "Du kommer fram först i morgon kväll kl 18 och åker söndag förmiddag. Vilken plats är bäst då?" | har ändrat tiden, med snabbval eller tidslinjen, och läser av det nya svaret |
+| 3 | "Du kommer fram först i morgon kväll kl 18 och åker söndag förmiddag. Vilken plats är bäst då?" | har ändrat tiden, med snabbval eller dag- och tidsknapparna, och läser av det nya svaret |
 | 4 | "Hitta Utö gästhamn och spara den som favorit." | har en stjärna på Utö gästhamn |
 | 5 | "Du är ute med en 7-metersbåt. Ändra så att sidan räknar för den, och se vad som händer med Utö." | har valt *under 8 m* och ser Utös färg och text |
 

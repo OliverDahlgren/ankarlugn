@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="style.css?v=20">
+  <link rel="stylesheet" href="style.css?v=21">
 </head>
 <body class="app">
   <header class="appbar">
@@ -86,10 +86,26 @@
               <button type="button" class="chip" data-preset="weekend">Helgen</button>
               <button type="button" class="chip" data-preset="short">Några timmar</button>
             </div>
-            <p id="tl-hint" class="tl-hint">Eller tryck på din ankomsttid i tidslinjen och sedan på avfärden.</p>
-            <div id="timeline" class="tl" role="group" aria-label="Tidslinje, en knapp per timme"></div>
-            <p class="tl-legend"><span id="tl-ref">Byvind</span> · <span class="wl w1"></span> svag <span class="wl w2"></span> måttlig
-              <span class="wl w3"></span> frisk <span class="wl w4"></span> hård</p>
+            <div class="when-edit">
+              <div class="when-row">
+                <span class="when-row-label" id="arrive-label">Ankomst</span>
+                <div class="day-chips" data-which="arrive" role="radiogroup" aria-labelledby="arrive-label"></div>
+                <div class="stepper" role="group" aria-label="Ankomsttid">
+                  <button type="button" data-which="arrive" data-step="-1" aria-label="Ankomst en timme tidigare">−</button>
+                  <output id="arrive-time" aria-live="polite">–</output>
+                  <button type="button" data-which="arrive" data-step="1" aria-label="Ankomst en timme senare">+</button>
+                </div>
+              </div>
+              <div class="when-row">
+                <span class="when-row-label" id="depart-label">Avfärd</span>
+                <div class="day-chips" data-which="depart" role="radiogroup" aria-labelledby="depart-label"></div>
+                <div class="stepper" role="group" aria-label="Avfärdstid">
+                  <button type="button" data-which="depart" data-step="-1" aria-label="Avfärd en timme tidigare">−</button>
+                  <output id="depart-time" aria-live="polite">–</output>
+                  <button type="button" data-which="depart" data-step="1" aria-label="Avfärd en timme senare">+</button>
+                </div>
+              </div>
+            </div>
           </section>
           <div class="filters">
             <button type="button" id="near" class="secondary">Nära mig</button>
@@ -148,6 +164,6 @@
     </aside>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

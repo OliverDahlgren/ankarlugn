@@ -265,7 +265,6 @@ async function evaluate(arrive, depart) {
   if (run !== evalRun) return;   // ett nyare val har redan startat
   lastRun = { results, arrive, depart };
   render();
-  updateTimelineWind();
 }
 
 // Avstånd fågelvägen i km (haversine).
@@ -671,7 +670,6 @@ function showMe(pos) {
   if (!renderedPos || distanceKm(renderedPos.lat, renderedPos.lon, myPos.lat, myPos.lon) > 0.2) {
     renderedPos = { ...myPos };
     render();
-    if (profiles) updateTimelineWind();
   }
 }
 
@@ -727,8 +725,7 @@ const HOUR = 3.6e6;
 const TL_DAYS = 5;
 const fmtDay = new Intl.DateTimeFormat('sv-SE', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ });
 const fmtWhen = new Intl.DateTimeFormat('sv-SE', { weekday: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: TZ });
-const REF_PLACE_ID = 'n3053781982';   // Sandhamn: referens för vinden i tidslinjen
-let stay = null, pickingDepart = false;
+let stay = null;
 
 function hourFloor(d) { const x = new Date(d); x.setMinutes(0, 0, 0); return x; }
 function dayAt(base, addDays, hour) { const x = new Date(base); x.setDate(x.getDate() + addDays); x.setHours(hour, 0, 0, 0); return x; }
@@ -754,107 +751,80 @@ const PRESETS = {
 
 function setStay(arrive, depart, preset = null) {
   stay = { arrive, depart };
-  pickingDepart = false;
   document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.preset === preset)));
   updateStayView();
-  scrollTimelineTo(arrive);
+  clearTimeout(evalTimer);
   evaluate(arrive, depart);
+}
+
+const DAY_COUNT = 6;
+const fmtWeekday = new Intl.DateTimeFormat('sv-SE', { weekday: 'short', day: 'numeric', timeZone: TZ });
+const fmtTime = new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', minute: '2-digit', timeZone: TZ });
+let evalTimer = null;
+
+function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+function daysBetween(a, b) { return Math.round((startOfDay(b) - startOfDay(a)) / 864e5); }
+
+function dayLabel(d) {
+  const diff = daysBetween(new Date(), d);
+  return diff === 0 ? 'Idag' : diff === 1 ? 'Imorgon' : fmtWeekday.format(d);
 }
 
 function updateStayView() {
   const { arrive, depart } = stay;
   document.getElementById('when-arrive').textContent = fmtWhen.format(arrive);
-  document.getElementById('when-depart').textContent = pickingDepart ? 'välj avfärd' : fmtWhen.format(depart);
-  document.getElementById('when-len').textContent = pickingDepart ? '' : `${Math.round((depart - arrive) / HOUR)} h`;
-  document.getElementById('tl-hint').textContent = pickingDepart
-    ? 'Tryck nu på när du lämnar.'
-    : 'Eller tryck på din ankomsttid i tidslinjen och sedan på avfärden.';
-  for (const cell of document.querySelectorAll('.tl-cell')) {
-    const t = Number(cell.dataset.t);
-    const end = pickingDepart ? arrive.getTime() : depart.getTime();
-    cell.classList.toggle('in-range', t >= arrive.getTime() && t < end);
-    cell.classList.toggle('is-start', t === arrive.getTime());
-    cell.classList.toggle('is-end', !pickingDepart && t === depart.getTime() - HOUR);
-    cell.setAttribute('aria-pressed', String(t >= arrive.getTime() && t < end));
-  }
-}
-
-function buildTimeline() {
-  const tl = document.getElementById('timeline');
-  tl.innerHTML = '';
-  const start = hourFloor(new Date());
-  const end = dayAt(start, TL_DAYS, 0);
-  let dayEl = null, hoursEl = null, dayKey = '';
-  for (let t = start; t < end; t = new Date(t.getTime() + HOUR)) {
-    const key = fmtDay.format(t);
-    if (key !== dayKey) {
-      dayKey = key;
-      dayEl = document.createElement('div');
-      dayEl.className = 'tl-day';
-      dayEl.innerHTML = `<div class="tl-day-label">${key}</div>`;
-      hoursEl = document.createElement('div');
-      hoursEl.className = 'tl-hours';
-      dayEl.appendChild(hoursEl);
-      tl.appendChild(dayEl);
+  document.getElementById('when-depart').textContent = fmtWhen.format(depart);
+  document.getElementById('when-len').textContent = `${Math.round((depart - arrive) / HOUR)} h`;
+  document.getElementById('arrive-time').textContent = fmtTime.format(arrive);
+  document.getElementById('depart-time').textContent = fmtTime.format(depart);
+  for (const box of document.querySelectorAll('.day-chips')) {
+    const which = box.dataset.which;
+    const chosen = startOfDay(stay[which]).getTime();
+    box.innerHTML = '';
+    const first = startOfDay(new Date());
+    for (let i = 0; i < DAY_COUNT; i++) {
+      const day = new Date(first); day.setDate(day.getDate() + i);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'day-chip';
+      b.setAttribute('role', 'radio');
+      b.setAttribute('aria-checked', String(day.getTime() === chosen));
+      b.textContent = dayLabel(day);
+      // Avfärd kan inte väljas före ankomstdagen.
+      if (which === 'depart' && day < startOfDay(stay.arrive)) b.disabled = true;
+      b.addEventListener('click', () => changeStay(which, { day }));
+      box.appendChild(b);
     }
-    const h = Number(fmtClock.format(t));
-    const cell = document.createElement('button');
-    cell.type = 'button';
-    cell.className = 'tl-cell' + (h >= 21 || h < 6 ? ' night' : '');
-    cell.dataset.t = String(t.getTime());
-    cell.setAttribute('aria-label', `${key} klockan ${h}`);
-    cell.innerHTML = `<span class="tl-h">${String(h).padStart(2, '0')}</span><span class="tl-w"></span><span class="tl-bar"></span>`;
-    cell.addEventListener('click', () => pickHour(new Date(t)));
-    hoursEl.appendChild(cell);
   }
 }
 
-function pickHour(t) {
-  if (!pickingDepart) {
-    stay = { arrive: t, depart: new Date(t.getTime() + HOUR) };
-    pickingDepart = true;
-    document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
-    updateStayView();
-    return;
+// Ändrar ankomst eller avfärd (dag eller ±timmar) och håller vistelsen giltig.
+function changeStay(which, { day = null, step = 0 }) {
+  let { arrive, depart } = stay;
+  const t = new Date(which === 'arrive' ? arrive : depart);
+  if (day) t.setFullYear(day.getFullYear(), day.getMonth(), day.getDate());
+  t.setTime(t.getTime() + step * HOUR);
+  const earliest = hourFloor(new Date());
+  if (which === 'arrive') {
+    arrive = t < earliest ? earliest : t;
+    // Kommer man fram efter avfärden flyttas avfärden: på förmiddagen 4 h senare, annars till kl 10 nästa morgon.
+    if (depart <= arrive) {
+      const h = arrive.getHours();
+      if (h >= 4 && h < 12) depart = new Date(arrive.getTime() + 4 * HOUR);
+      else {
+        depart = dayAt(arrive, 0, 10);
+        if (depart - arrive < 3 * HOUR) depart = dayAt(arrive, 1, 10);
+      }
+    }
+  } else {
+    depart = t <= arrive ? new Date(arrive.getTime() + HOUR) : t;
   }
-  if (t < stay.arrive) {   // tryckte före ankomsten: börja om därifrån
-    stay = { arrive: t, depart: new Date(t.getTime() + HOUR) };
-    updateStayView();
-    return;
-  }
-  setStay(stay.arrive, new Date(t.getTime() + HOUR));
-}
-
-function scrollTimelineTo(t) {
-  const cell = document.querySelector(`.tl-cell[data-t="${hourFloor(t).getTime()}"]`);
-  const tl = document.getElementById('timeline');
-  if (!cell) return;
-  const left = tl.scrollLeft + cell.getBoundingClientRect().left - tl.getBoundingClientRect().left - tl.clientWidth / 4;
-  tl.scrollLeft = Math.max(0, left);
-}
-
-// Vindprognosen i tidslinjen, från närmaste plats (eller Sandhamn innan positionen är känd).
-async function updateTimelineWind() {
-  let ref = profiles.places.find(p => p.id === REF_PLACE_ID) || profiles.places[0];
-  if (myPos) {
-    ref = profiles.places.reduce((a, b) =>
-      distanceKm(myPos.lat, myPos.lon, a.lat, a.lon) <= distanceKm(myPos.lat, myPos.lon, b.lat, b.lon) ? a : b);
-  }
-  let series;
-  try { series = await loadForecast(ref); } catch { return; }
-  document.getElementById('tl-ref').textContent = `Byvind vid ${ref.name.split(',')[0]} (m/s)`;
-  for (const cell of document.querySelectorAll('.tl-cell')) {
-    const t = Number(cell.dataset.t);
-    let best = null;
-    for (const s of series) if (!best || Math.abs(s.t - t) < Math.abs(best.t - t)) best = s;
-    const w = cell.querySelector('.tl-w');
-    if (!best || Math.abs(best.t - t) > 3 * HOUR) { w.textContent = ''; cell.dataset.wind = ''; continue; }
-    const g = Math.round(best.gust);
-    // Pilen pekar dit vinden blåser.
-    w.innerHTML = `<span class="tl-arrow" style="transform: rotate(${best.dir + 180}deg)">↑</span>${g}`;
-    w.title = `${compass(best.dir)} ${Math.round(best.wind)} m/s, byar ${g} m/s`;
-    cell.dataset.wind = g < 8 ? '1' : g < 14 ? '2' : g < 20 ? '3' : '4';
-  }
+  stay = { arrive, depart };
+  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', 'false'));
+  updateStayView();
+  // Vänta lite så att flera snabba tryck på +/− bara ger en ny bedömning.
+  clearTimeout(evalTimer);
+  evalTimer = setTimeout(() => evaluate(stay.arrive, stay.depart), 350);
 }
 
 async function init() {
@@ -884,7 +854,8 @@ async function init() {
       .on('click', () => openPlace(p.id));
   }
 
-  buildTimeline();
+  document.querySelectorAll('.stepper button').forEach(b =>
+    b.addEventListener('click', () => changeStay(b.dataset.which, { step: Number(b.dataset.step) })));
   document.querySelectorAll('.chip').forEach(chip =>
     chip.addEventListener('click', () => setStay(...PRESETS[chip.dataset.preset](), chip.dataset.preset)));
   document.getElementById('near').addEventListener('click', locate);
