@@ -344,12 +344,17 @@ function toLocalInput(d) {
 
 async function init() {
   map = L.map('map', { zoomControl: true }).setView([59.42, 18.75], 9);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 18, attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  const osmAttr = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
+  // OSM har inga kartbitar i dubbel upplösning. Med detectRetina hämtas en zoomnivå mer detaljerade
+  // bitar på skärmar med hög upplösning, så att kustlinjer och text blir skarpa (men texten mindre).
+  const sharp = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, detectRetina: true, attribution: osmAttr,
   }).addTo(map);
-  L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
-    maxZoom: 18, attribution: '© <a href="https://www.openseamap.org">OpenSeaMap</a>',
+  const plain = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: osmAttr });
+  const seamarks = L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
+    maxZoom: 18, detectRetina: true, attribution: '© <a href="https://www.openseamap.org">OpenSeaMap</a>',
   }).addTo(map);
+  L.control.layers({ 'Skarp karta': sharp, 'Större text': plain }, { 'Sjömärken': seamarks }, { position: 'topright' }).addTo(map);
   rayLayer = L.layerGroup().addTo(map);
 
   const res = await fetch('data/profiles.json');
