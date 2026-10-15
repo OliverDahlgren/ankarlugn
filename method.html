@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ankarlugn – så räknar sidan</title>
+  <link rel="stylesheet" href="style.css">
+  <style>body { display: block; } main { display: block; border: 0; max-width: 46rem; padding: 0 16px 24px; }</style>
+</head>
+<body>
+  <header><h1>Så räknar sidan</h1><p><a href="./">← Till kartan</a></p></header>
+  <main>
+    <p class="warning"><strong>Endast ett hjälpmedel.</strong> Modellen är medvetet enkel. Den vet inget om djup, botten,
+      grund, svall från båttrafik, strömmar eller hur vinden vrider runt öar och berg. Använd sjökort och eget omdöme.</p>
+
+    <h2>1. Skyddsprofil per plats (räknas en gång)</h2>
+    <p>För varje plats och var tionde grad, totalt 36 riktningar, mäts hur långt det är över öppet vatten till närmaste
+      kustlinje i OpenStreetMap, upp till högst 20 km. Det kallas stryklängd.
+      En enda stråle kan ge fel bild i skärgården. Den kan slinka ut genom ett smalt sund, eller stoppas av ett litet skär
+      som vågorna går runt. Därför används <em>effektiv stryklängd</em> enligt Shore Protection Manual (1984):
+      nio strålar inom ±12° kring riktningen, vägda med cos².
+      Om platsens punkt ligger på land, till exempel på en brygga, flyttas den först till närmaste vatten.
+      Resultatet finns i <code>data/profiles.json</code>. Klicka på en plats på kartan för att se mittstrålarna.</p>
+
+    <h2>2. Prognosen timme för timme</h2>
+    <p>Sidan hämtar vindriktning, medelvind och byvind från SMHI:s öppna prognos för varje plats. För varje timme under
+      vistelsen används den största stryklängden inom ±10° från vindriktningen, eftersom vinden pendlar.
+      Ur medelvind <em>U</em> och stryklängd <em>F</em> uppskattas våghöjden med en vanlig formel för sjö som begränsas
+      av stryklängden, JONSWAP: <em>H<sub>s</sub></em> = 0,0016 · <em>U</em> · √(<em>F</em>/<em>g</em>).</p>
+    <ul>
+      <li><strong>Grön</strong>: under 0,2 m sjö.</li>
+      <li><strong>Gul</strong>: 0,2–0,4 m sjö, byar över 18 m/s, eller helt öppet mot havet när det blåser minst 6 m/s.</li>
+      <li><strong>Röd</strong>: över 0,4 m sjö, eller byar över 24 m/s.</li>
+    </ul>
+
+    <h2>3. Rangordning efter sämsta timmen</h2>
+    <p>Platserna sorteras efter sin sämsta timme under vistelsen, inte efter medelvärdet. En plats som är
+      perfekt till kl 02 och sedan utsatt hamnar alltså efter en plats som är hyggligt skyddad hela natten.</p>
+
+    <h2>Källor</h2>
+    <p>Platser och kustlinje: © OpenStreetMap-bidragsgivare, ODbL (taggarna <code>seamark:type=anchorage</code>,
+      <code>leisure=marina</code> och <code>natural=coastline</code>). Prognos: SMHI öppna data, CC BY 4.0.
+      Inga uppgifter är hämtade från hamnguider.</p>
+  </main>
+</body>
+</html>

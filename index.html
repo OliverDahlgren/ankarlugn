@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ankarlugn – var ligger jag bäst i natt?</title>
+  <meta name="description" content="Hitta natthamn eller ankringsplats med bäst lä i Stockholms skärgård, för hela tiden du ligger där.">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Ankarlugn</h1>
+    <p class="warning"><strong>Endast ett hjälpmedel.</strong> Sidan ersätter inte sjökort, egen bedömning och gott sjömanskap.
+      Beräkningen bygger på en förenklad modell och kan ha fel. Djup, botten, grund, svall och trafik ingår inte.</p>
+    <form id="stay">
+      <label>Ankomst <input type="datetime-local" id="arrive" required></label>
+      <label>Avfärd <input type="datetime-local" id="depart" required></label>
+      <button type="submit">Visa lä</button>
+    </form>
+    <p id="status" role="status"></p>
+  </header>
+  <main>
+    <div id="map" aria-label="Karta över platserna"></div>
+    <section id="list" aria-label="Platser rangordnade efter sämsta timmen">
+      <h2>Bäst lä under hela vistelsen</h2>
+      <ol id="ranking"></ol>
+    </section>
+  </main>
+  <footer>
+    <p><span class="dot green"></span> Skyddat hela tiden <span class="dot yellow"></span> Visst sjöhävning någon timme
+      <span class="dot red"></span> Utsatt någon timme. Rangordningen följer den <em>sämsta</em> timmen, inte medelvärdet.</p>
+    <p>Prognos: <a href="https://www.smhi.se/data/oppna-data">SMHI öppna data</a> (CC BY 4.0).
+      Platser, kustlinje och karta: © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-bidragsgivare</a> (ODbL),
+      sjömärken © <a href="https://www.openseamap.org">OpenSeaMap</a>.
+      <a href="method.html">Så räknar sidan</a>.</p>
+  </footer>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
