@@ -316,6 +316,34 @@ function shortReason(r) {
   return `${w.cls === 'red' ? 'Utsatt' : 'Sjöhävning'} ${when} · vind ${compass(first.dir)}, ${sea}`;
 }
 
+// En rad i listorna (alla platser, favoriter, sökresultat).
+function placeRow(r) {
+  const cls = r.worst ? r.worst.cls : 'grey';
+  const dist = r.place.dist != null ? ` · ${km(r.place.dist)}` : '';
+  const swell = r.place.ferry_m != null && r.place.ferry_m < FERRY_NEAR_M ? ' <span class="badge" title="Linjetrafik nära">svall</span>' : '';
+  const star = favs.has(r.place.id) ? ' <span class="fav-star" title="Favorit" aria-hidden="true">★</span>' : '';
+  const li = document.createElement('li');
+  li.innerHTML = `<button type="button" class="place-btn" data-id="${esc(r.place.id)}" aria-label="${esc(r.place.name)}${favs.has(r.place.id) ? ', favorit' : ''}, ${STATUS_LABEL[cls]}. Visa detaljer">
+    <span class="name">${esc(r.place.name)}</span>${star} <span class="dot ${cls}" aria-hidden="true"></span>${swell}<br>
+    <span class="why">${esc(r.place.kind)}${dist} · ${esc(shortReason(r))}</span>${r.hours.length ? timeline(r.hours) : ''}</button>`;
+  li.querySelector('button').addEventListener('click', () => openPlace(r.place.id));
+  return li;
+}
+
+// Sök utan att bry sig om stora bokstäver eller prickar och ringar: "moja" hittar "Möja".
+function normalize(text) {
+  return text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+// Favoriter sparas bara i den här webbläsaren.
+const favs = new Set((() => { try { return JSON.parse(localStorage.getItem('ankarlugn-favs') || '[]'); } catch { return []; } })());
+
+function toggleFav(id) {
+  if (favs.has(id)) favs.delete(id); else favs.add(id);
+  try { localStorage.setItem('ankarlugn-favs', JSON.stringify([...favs])); } catch {}
+  render();
+}
+
 function render() {
   if (!lastRun) return;
   const { results, arrive, depart } = lastRun;
@@ -325,23 +353,39 @@ function render() {
   const shown = results.filter(r => matchesFilters(r.place));
   renderBest(shown);
 
-  const list = document.getElementById('ranking');
-  list.innerHTML = '';
+  const query = normalize(document.getElementById('search').value.trim());
+  const searching = query.length > 0;
+  document.getElementById('view-list').classList.toggle('searching', searching);
   for (const r of results) {
     const cls = r.worst ? r.worst.cls : 'grey';
     const visible = shown.includes(r);
-    markers[r.place.id].setStyle({ fillColor: COLORS[cls], fillOpacity: visible ? 0.95 : 0.15, opacity: visible ? 1 : 0.3 });
-    if (!visible) continue;
-    const dist = r.place.dist != null ? ` · ${km(r.place.dist)}` : '';
-    const swell = r.place.ferry_m != null && r.place.ferry_m < FERRY_NEAR_M ? ' <span class="badge" title="Linjetrafik nära">svall</span>' : '';
-    const li = document.createElement('li');
-    li.innerHTML = `<button type="button" class="place-btn" data-id="${esc(r.place.id)}" aria-label="${esc(r.place.name)}, ${STATUS_LABEL[cls]}. Visa detaljer">
-      <span class="name">${esc(r.place.name)}</span> <span class="dot ${cls}" aria-hidden="true"></span>${swell}<br>
-      <span class="why">${esc(r.place.kind)}${dist} · ${esc(shortReason(r))}</span>${r.hours.length ? timeline(r.hours) : ''}</button>`;
-    li.querySelector('button').addEventListener('click', () => openPlace(r.place.id));
-    list.appendChild(li);
+    markers[r.place.id].setStyle({
+      fillColor: COLORS[cls], fillOpacity: visible ? 0.95 : 0.15, opacity: visible ? 1 : 0.3,
+      color: favs.has(r.place.id) ? '#f2b84b' : '#fff', weight: favs.has(r.place.id) ? 3 : 2,
+    });
   }
-  if (!shown.length) list.innerHTML = '<li class="empty-state">Inga platser matchar filtret. Öka avståndet eller visa alla typer.</li>';
+
+  // Favoriter: alltid med, oavsett filter, i samma ordning som rangordningen.
+  const favRows = results.filter(r => favs.has(r.place.id));
+  const favList = document.getElementById('fav-list');
+  favList.innerHTML = '';
+  favRows.forEach(r => favList.appendChild(placeRow(r)));
+  document.getElementById('favs').hidden = searching || !favRows.length;
+
+  const list = document.getElementById('ranking');
+  list.innerHTML = '';
+  // Sökträffar där namnet börjar med sökordet först, sedan i rangordning.
+  const rows = searching
+    ? results.filter(r => normalize(r.place.name).includes(query))
+      .sort((a, b) => Number(!normalize(a.place.name).startsWith(query)) - Number(!normalize(b.place.name).startsWith(query)))
+    : shown;
+  rows.forEach(r => list.appendChild(placeRow(r)));
+  document.getElementById('list-title').textContent = searching ? `Sökresultat (${rows.length})` : 'Alla platser';
+  if (!rows.length) {
+    list.innerHTML = searching
+      ? '<li class="empty-state">Ingen plats matchar sökningen. Platserna kommer från OpenStreetMap.</li>'
+      : '<li class="empty-state">Inga platser matchar filtret. Öka avståndet eller visa alla typer.</li>';
+  }
 
   const truncated = results.find(r => r.truncated);
   const failed = results.filter(r => r.error).length;
@@ -473,7 +517,10 @@ function renderDetail(id) {
   const el = document.getElementById('view-detail');
   el.innerHTML = `
     <button type="button" class="detail-back" aria-label="Tillbaka till alla platser">‹ Alla platser</button>
-    <h2 class="detail-title">${esc(place.name)}</h2>
+    <div class="detail-head">
+      <h2 class="detail-title">${esc(place.name)}</h2>
+      <button type="button" class="fav-btn" aria-pressed="${favs.has(id)}" data-act="fav">${favs.has(id) ? '★ Sparad' : '☆ Spara'}</button>
+    </div>
     <p class="detail-sub">${statusBadge(cls)} <span>${esc(place.kind)} · ${fmtWhen.format(stay.arrive)} → ${fmtWhen.format(stay.depart)}</span></p>
     <ul class="facts">${facts.map(f => typeof f === 'string' ? `<li>${esc(f)}</li>` : `<li class="warn">${esc(f.text)}</li>`).join('')}</ul>
     <p class="detail-summary">${esc(r ? (r.error || describe(place, r.hours, r.worst)) : describe(place, [], null))}</p>
@@ -492,6 +539,10 @@ function renderDetail(id) {
   el.querySelector('.detail-back').addEventListener('click', () => {
     if (history.length > 1 && location.hash.startsWith('#plats=')) history.back();
     else { history.replaceState(null, '', location.pathname + location.search); closeDetail(); }
+  });
+  el.querySelector('[data-act="fav"]').addEventListener('click', () => {
+    toggleFav(id);
+    el.querySelector('[data-act="fav"]')?.focus();
   });
   const note = el.querySelector('.copied');
   el.querySelector('[data-act="copy"]').addEventListener('click', async () => {
@@ -845,6 +896,18 @@ async function init() {
     else map.fitBounds(L.latLngBounds(profiles.places.map(p => [p.lat, p.lon])).extend([myPos.lat, myPos.lon]), { padding: [20, 20] });
   });
   document.getElementById('kind').addEventListener('change', render);
+  const search = document.getElementById('search');
+  search.addEventListener('input', render);
+  search.addEventListener('focus', () => setSnap(window.matchMedia('(max-width: 899px)').matches ? 'full' : null));
+  search.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      document.querySelector('#ranking .place-btn')?.click();
+    } else if (e.key === 'Escape') {
+      search.value = '';
+      render();
+    }
+  });
   const boatSel = document.getElementById('boat');
   try { if (BOATS[localStorage.getItem('ankarlugn-boat')]) boatSel.value = localStorage.getItem('ankarlugn-boat'); } catch {}
   boatSel.addEventListener('change', () => {

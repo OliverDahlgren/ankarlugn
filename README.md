@@ -52,6 +52,11 @@ vilket den första kalibreringen inte kunde (se metodsidan).
 Scheman i GitHub Actions stängs av om repot är helt inaktivt i 60 dagar. GitHub skickar då ett mejl, och loggningen
 kan slås på igen under fliken Actions.
 
+## Användartest
+
+[docs/anvandartest.md](docs/anvandartest.md) är en guide för ett enkelt test med fem personer: uppgifter,
+frågor, protokoll och hur resultatet tolkas.
+
 ## Källor och licenser
 
 - Platser och kustlinje: © OpenStreetMap-bidragsgivare, [ODbL](https://www.openstreetmap.org/copyright).

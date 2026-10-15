@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&display=swap">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="stylesheet" href="style.css?v=20">
 </head>
 <body class="app">
   <header class="appbar">
@@ -56,6 +56,10 @@
       <div class="sheet-handle" role="button" tabindex="0" aria-label="Visa mer eller mindre av listan"><span></span></div>
       <div class="panel-scroll" id="panel-scroll">
         <div id="view-list">
+          <div class="search" role="search">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <input type="search" id="search" placeholder="Sök plats, t.ex. Utö eller Möja" aria-label="Sök plats" autocomplete="off" enterkeyhint="search">
+          </div>
           <p class="meta"><span id="forecast-age" class="forecast-age" hidden></span></p>
           <section class="best" aria-labelledby="best-title">
             <div class="best-head">
@@ -63,6 +67,10 @@
               <button type="button" class="link-btn" id="best-when">–</button>
             </div>
             <div id="best-cards" class="best-cards" aria-live="polite"></div>
+          </section>
+          <section class="favs" id="favs" aria-labelledby="favs-title" hidden>
+            <h2 id="favs-title" class="section-title">Dina favoriter</h2>
+            <ol id="fav-list" class="plain-list"></ol>
           </section>
           <section class="when" aria-labelledby="when-title">
             <div class="when-head">
@@ -140,6 +148,6 @@
     </aside>
   </div>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>
