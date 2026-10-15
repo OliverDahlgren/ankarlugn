@@ -63,6 +63,19 @@ main { flex: 1; display: flex; min-height: 0; border-top: 1px solid var(--line);
 .leaflet-popup-content { font-size: 0.9rem; max-width: 300px; }
 .leaflet-popup-content .why { color: #444; }
 .rose { display: block; margin: 6px auto 0; }
+.me-icon { position: relative; }
+.me-dot {
+  position: absolute; left: 4px; top: 4px; width: 14px; height: 14px; border-radius: 50%;
+  background: #2a7de1; border: 2px solid #fff; box-shadow: 0 0 4px rgba(0, 0, 0, .4); box-sizing: border-box;
+}
+.me-pulse {
+  position: absolute; left: 0; top: 0; width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(42, 125, 225, .35); animation: me-pulse 2s ease-out infinite;
+}
+@keyframes me-pulse { from { transform: scale(.6); opacity: 1; } to { transform: scale(2.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .me-pulse { animation: none; } }
+.me-locate { display: block; position: relative; width: 30px; height: 30px; background: #fff; }
+.me-locate .me-dot { left: 8px; top: 8px; }
 footer { font-size: 0.8rem; color: var(--muted); }
 footer p { margin: 2px 0; }
 @media (max-width: 760px) {

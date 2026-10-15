@@ -267,29 +267,74 @@ function render() {
   ].filter(Boolean).join(' '));
 }
 
+const ME_ICON = L.divIcon({ className: 'me-icon', html: '<span class="me-pulse"></span><span class="me-dot"></span>', iconSize: [22, 22] });
+let accuracyCircle = null, watchId = null, renderedPos = null, locateControl = null;
+
+// Ritar den blå pricken (och noggrannhetscirkeln) där du är.
+function showMe(pos) {
+  myPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+  const ll = [myPos.lat, myPos.lon];
+  const acc = pos.coords.accuracy || 0;
+  if (!myMarker) {
+    accuracyCircle = L.circle(ll, { radius: acc, color: '#2a7de1', weight: 1, fillColor: '#2a7de1', fillOpacity: 0.12, interactive: false }).addTo(map);
+    myMarker = L.marker(ll, { icon: ME_ICON, zIndexOffset: 1000, keyboard: false }).bindTooltip('Du är här').addTo(map);
+  } else {
+    myMarker.setLatLng(ll);
+    accuracyCircle.setLatLng(ll).setRadius(acc);
+  }
+  if (!locateControl) locateControl = addLocateControl();
+  // Räkna om avstånden bara när du har flyttat dig en bit, så att listan inte hoppar i onödan.
+  if (!renderedPos || distanceKm(renderedPos.lat, renderedPos.lon, myPos.lat, myPos.lon) > 0.2) {
+    renderedPos = { ...myPos };
+    render();
+  }
+}
+
+function addLocateControl() {
+  const Ctl = L.Control.extend({
+    options: { position: 'topleft' },
+    onAdd() {
+      const a = L.DomUtil.create('a', 'leaflet-bar me-locate');
+      a.href = '#';
+      a.title = 'Visa var jag är';
+      a.setAttribute('role', 'button');
+      a.setAttribute('aria-label', 'Visa var jag är');
+      a.innerHTML = '<span class="me-dot"></span>';
+      L.DomEvent.on(a, 'click', e => {
+        L.DomEvent.preventDefault(e);
+        if (myPos) map.setView([myPos.lat, myPos.lon], Math.max(map.getZoom(), 13));
+      });
+      L.DomEvent.disableClickPropagation(a);
+      return a;
+    },
+  });
+  return new Ctl().addTo(map);
+}
+
 function locate() {
   const btn = document.getElementById('near');
   if (!navigator.geolocation) { setStatus('Webbläsaren kan inte ge din position.'); return; }
   btn.disabled = true;
   btn.textContent = 'Söker position …';
   navigator.geolocation.getCurrentPosition(pos => {
-    myPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
     btn.disabled = false;
     btn.textContent = 'Uppdatera position';
     document.getElementById('radius-label').hidden = false;
-    if (myMarker) myMarker.remove();
-    myMarker = L.circleMarker([myPos.lat, myPos.lon], { radius: 7, color: '#fff', weight: 3, fillColor: '#2a7de1', fillOpacity: 1 })
-      .bindTooltip('Du är här').addTo(map);
-    render();
+    renderedPos = null;
+    showMe(pos);
     const radius = Number(document.getElementById('radius').value) || 20;
     map.fitBounds(L.latLng(myPos.lat, myPos.lon).toBounds(radius * 2000));
+    // Fortsätt följa positionen så att pricken flyttar med båten.
+    if (watchId == null && navigator.geolocation.watchPosition) {
+      watchId = navigator.geolocation.watchPosition(showMe, () => {}, { enableHighAccuracy: true, maximumAge: 30000 });
+    }
   }, err => {
     btn.disabled = false;
     btn.textContent = 'Nära mig';
     setStatus(err.code === err.PERMISSION_DENIED
       ? 'Du har inte gett sidan tillgång till din position. Tillåt plats i webbläsaren och försök igen.'
       : 'Kunde inte hitta din position just nu.');
-  }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
+  }, { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 });
 }
 
 function toLocalInput(d) {
