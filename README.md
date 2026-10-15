@@ -35,6 +35,16 @@ https://oliverdahlgren.github.io/ankarlugn/.
 
 SMHI:s API tillåter anrop direkt från webbläsaren, så sidan behöver ingen server eller GitHub Action.
 
+## Loggning för framtida kalibrering
+
+GitHub Action `.github/workflows/logg.yml` körs fyra gånger per dygn. Den sparar SMHI:s prognosvind 48 h framåt
+och uppmätt vind och vågor för fem vindstationer och vågbojen Huvudskär Ost, som CSV-filer på grenen
+[`logg`](../../tree/logg). Med några månaders data kan vågmodellen kalibreras mot just prognosvinden,
+vilket den första kalibreringen inte kunde (se metodsidan).
+
+Scheman i GitHub Actions stängs av om repot är helt inaktivt i 60 dagar. GitHub skickar då ett mejl, och loggningen
+kan slås på igen under fliken Actions.
+
 ## Källor och licenser
 
 - Platser och kustlinje: © OpenStreetMap-bidragsgivare, [ODbL](https://www.openstreetmap.org/copyright).

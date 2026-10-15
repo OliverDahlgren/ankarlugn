@@ -1,0 +1,51 @@
+# Loggar SMHI:s prognosvind och uppmätt vind och vågor fyra gånger per dygn till grenen `logg`,
+# så att vågmodellen senare kan kalibreras mot prognosvinden (se scripts/log_observations.py).
+# Grenen `logg` hålls skild från `main`, så att loggningen inte bygger om webbsidan varje gång.
+name: Logga prognos och mätningar
+
+on:
+  schedule:
+    - cron: "20 1,7,13,19 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: logg
+  cancel-in-progress: false
+
+jobs:
+  logg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hämta eller skapa grenen logg
+        run: |
+          if git fetch --depth 1 origin logg; then
+            git worktree add logg FETCH_HEAD
+            git -C logg checkout -B logg
+          else
+            git worktree add --detach logg
+            git -C logg checkout --orphan logg
+            git -C logg rm -rf --quiet .
+            printf '# Loggdata för Ankarlugn\n\nSkapas av .github/workflows/logg.yml på grenen main. Data: SMHI öppna data (CC BY 4.0).\n' > logg/README.md
+          fi
+
+      - name: Logga
+        run: python3 scripts/log_observations.py --out logg/logs
+
+      - name: Spara
+        working-directory: logg
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Inget nytt att spara."
+          else
+            git commit --quiet -m "Logg $(date -u +%Y-%m-%dT%H:%MZ)"
+            git push origin logg
+          fi
