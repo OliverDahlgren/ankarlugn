@@ -135,3 +135,67 @@ fetch('data/validation.json').then(r => r.json()).then(v => {
 }).catch(() => {
   document.getElementById('validation').textContent = 'Kontrollen kunde inte laddas.';
 });
+
+// Kalibreringen (data/calibration.json): beslut, faktor per vindkälla och prövning per block.
+function cell(tr, text, tag = 'td') {
+  const c = document.createElement(tag);
+  c.textContent = text;
+  tr.appendChild(c);
+}
+
+fetch('data/calibration.json').then(r => r.json()).then(c => {
+  const root = document.getElementById('calibration');
+  const decision = document.createElement('p');
+  decision.className = 'cal-decision';
+  decision.textContent = `Resultat: ${c.decision} Sidan använder faktorn ×${fmt(c.wave_factor)}.`;
+  root.appendChild(decision);
+
+  const names = Object.keys(c.sources);
+  const t = document.createElement('table');
+  t.className = 'val-table';
+  const head = t.createTHead().insertRow();
+  cell(head, '', 'th');
+  for (const n of names) cell(head, `Vind från ${n}`, 'th');
+  const body = t.createTBody();
+  const rows = [
+    ['Faktor (vikt 3:1)', a => `×${fmt(a.k)} (90 %: ${fmt(a.k_90[0])}–${fmt(a.k_90[1])})`],
+    ['Faktor med vikt 1:1 / 5:1', a => `×${fmt(a.k_by_weight['1'])} / ×${fmt(a.k_by_weight['5'])}`],
+    ['Faktor med minsta kvadratmetoden', a => `×${fmt(a.k_least_squares)} (90 %: ${fmt(a.k_least_squares_90[0])}–${fmt(a.k_least_squares_90[1])})`],
+    ['Slår ”ingen korrektion” i', a => `${a.folds_better} av ${a.folds.length} block`],
+    ['Missade grova timmar, utan / med faktor', a => `${a.full_period.miss_1} / ${a.full_period.miss_k}`],
+    ['Onödiga varningar, utan / med faktor', a => `${a.full_period.false_alarm_1} / ${a.full_period.false_alarm_k}`],
+  ];
+  for (const [label, f] of rows) {
+    const tr = body.insertRow();
+    cell(tr, label, 'th');
+    for (const n of names) cell(tr, f(c.sources[n]));
+  }
+  root.appendChild(t);
+
+  for (const n of names) {
+    const ft = document.createElement('table');
+    ft.className = 'val-table';
+    ft.createCaption().textContent = `Prövning på osedda block, vind från ${n}`;
+    const h = ft.createTHead().insertRow();
+    for (const x of ['Testblock', 'Faktor från övriga block', 'Missade (utan / med)', 'Onödiga varningar (utan / med)', 'Bättre?']) cell(h, x, 'th');
+    const b = ft.createTBody();
+    for (const f of c.sources[n].folds) {
+      const tr = b.insertRow();
+      cell(tr, `${f.days[0].slice(5)} – ${f.days[1].slice(5)}`);
+      cell(tr, `×${fmt(f.k_train)}`);
+      cell(tr, `${f.miss_1} / ${f.miss_k}`);
+      cell(tr, `${f.false_alarm_1} / ${f.false_alarm_k}`);
+      cell(tr, f.cost_k < f.cost_1 ? 'ja' : 'nej');
+    }
+    root.appendChild(ft);
+  }
+
+  const note = document.createElement('p');
+  note.textContent = 'Slutsats: Vindkällorna drar åt olika håll, och deras intervall överlappar inte. Skillnaden beror alltså mest '
+    + 'på vilken vind modellen får, inte på vågformeln. Med vind från närmaste station (Berga) stämmer formeln i genomsnitt '
+    + '(minsta kvadrat nära ×1). För att kalibrera på riktigt behövs SMHI:s egen prognosvind jämförd med mätningar under '
+    + 'längre tid. Tills dess används ingen korrektion.';
+  if (c.wave_factor === 1) root.appendChild(note);
+}).catch(() => {
+  document.getElementById('calibration').textContent = 'Kalibreringen kunde inte laddas.';
+});

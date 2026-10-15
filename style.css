@@ -158,3 +158,4 @@ footer p { margin: 2px 0; }
 .val-table caption { text-align: left; font-weight: 600; margin-bottom: 4px; }
 .val-table th, .val-table td { border-bottom: 1px solid var(--line); padding: 4px 10px; text-align: left; }
 .val-table td { font-variant-numeric: tabular-nums; }
+.cal-decision { padding: 8px 10px; border-left: 4px solid var(--accent); background: var(--card); font-weight: 600; }

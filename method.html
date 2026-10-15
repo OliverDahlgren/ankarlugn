@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Ankarlugn – så räknar sidan</title>
-  <link rel="stylesheet" href="style.css?v=12">
+  <link rel="stylesheet" href="style.css?v=13">
   <style>body { display: block; } main { display: block; border: 0; max-width: 46rem; padding: 0 16px 24px; }</style>
 </head>
 <body>
@@ -80,11 +80,29 @@
     </ul>
     <div id="validation"></div>
 
+    <h2 id="kalibrering">Kalibrering</h2>
+    <p>Bojen mäter våghöjd, inte komfort. Därför kalibreras bara en sak: en faktor som multipliceras med modellens
+      beräknade våghöjd. Gränserna för gult och rött ändras inte. Regeln bestämdes innan resultatet var känt:</p>
+    <ol>
+      <li><strong>Anpassning.</strong> För varje vindkälla väljs den faktor som ger minst kostnad, där en missad grov timme
+        (uppmätt gul eller röd men beräknad grön) räknas som tre onödiga varningar. Viktningen är en bedömning, så
+        resultatet visas även för 1:1 och 5:1.</li>
+      <li><strong>Prövning på osedda data.</strong> Månaden delas i fyra sammanhängande block om cirka åtta dagar.
+        Faktorn anpassas på tre block och prövas på det fjärde. Hela dagar används eftersom timmar som ligger nära
+        varandra nästan är kopior. Faktorn räknas som en förbättring om den slår ”ingen korrektion” i minst tre av fyra block.</li>
+      <li><strong>Beslut.</strong> Faktorn används bara om den förbättrar för båda vindkällorna och båda pekar åt samma håll.
+        Då väljs den som ändrar minst. Annars blir faktorn 1, alltså ingen ändring.</li>
+    </ol>
+    <p>Osäkerheten i faktorn visas som ett 90-procentsintervall. Det är framräknat genom att dra om hela dagar
+      1 000 gånger (bootstrap). Skriptet är <code>scripts/calibrate.py</code> och regeln testas i
+      <code>tests/test_calibrate.py</code>.</p>
+    <div id="calibration"></div>
+
     <h2>Källor</h2>
     <p>Platser och kustlinje: © OpenStreetMap-bidragsgivare, ODbL (taggarna <code>seamark:type=anchorage</code>,
       <code>leisure=marina</code> och <code>natural=coastline</code>). Prognos, vind- och vågmätningar: SMHI öppna data, CC BY 4.0.
       Inga uppgifter är hämtade från hamnguider.</p>
   </main>
-  <script src="validation.js?v=2"></script>
+  <script src="validation.js?v=3"></script>
 </body>
 </html>

@@ -59,9 +59,12 @@ function fetchFor(place, dirDeg, spread = SPREAD_MIN_DEG) {
   return worst;
 }
 
+// Korrektionsfaktor från kalibreringen mot vågbojen (data/calibration.json, se method.html).
+let waveFactor = 1;
+
 // Signifikant våghöjd för stryklängdsbegränsad sjö (JONSWAP): Hs = 0.0016 · U · √(F/g).
 function waveHeight(windMs, fetchM) {
-  return 0.0016 * windMs * Math.sqrt(fetchM / 9.81);
+  return waveFactor * 0.0016 * windMs * Math.sqrt(fetchM / 9.81);
 }
 
 function rateHour(place, h) {
@@ -529,8 +532,12 @@ async function init() {
   L.control.layers({ 'Skarp karta': sharp, 'Större text': plain }, { 'Sjömärken': seamarks }, { position: 'topright' }).addTo(map);
   rayLayer = L.layerGroup().addTo(map);
 
-  const res = await fetch('data/profiles.json');
+  const [res, cal] = await Promise.all([
+    fetch('data/profiles.json'),
+    fetch('data/calibration.json').then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
   profiles = await res.json();
+  if (cal && Number.isFinite(cal.wave_factor) && cal.wave_factor > 0) waveFactor = cal.wave_factor;
   for (const p of profiles.places) {
     markers[p.id] = L.circleMarker([p.lat, p.lon], { radius: 8, color: '#fff', weight: 2, fillColor: COLORS.grey, fillOpacity: 0.95 })
       .bindTooltip(p.name).addTo(map)
