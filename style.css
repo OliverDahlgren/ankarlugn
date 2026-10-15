@@ -36,13 +36,47 @@ a { color: var(--accent); }
 header, footer { padding: 10px 16px; }
 h1 { margin: 0 0 4px; font-size: 1.4rem; }
 h2 { font-size: 1rem; margin: 0 0 8px; }
-.warning {
+.warning, .about {
   margin: 0 0 10px;
   padding: 8px 10px;
   border-left: 4px solid var(--red);
   background: var(--card);
   font-size: 0.9rem;
 }
+.about { margin: 4px 0 10px; color: var(--fg); }
+.about h2 { margin: 0 0 4px; font-size: .95rem; }
+.about p { margin: 0; }
+
+/* Logotyp: båt för ankar i stiltje */
+.brand { display: flex; align-items: center; gap: 14px; margin: 2px 0 14px; }
+.brand-mark { flex: none; width: 92px; height: 70px; overflow: hidden; }
+.bm-ink { stroke: var(--fg); }
+.bm-hull { fill: var(--fg); }
+.bm-sail { fill: var(--muted); }
+.bm-rode { stroke: var(--muted); opacity: .6; }
+.bm-reflect { color: var(--fg); }
+.bm-wave { stroke: var(--accent); }
+.bm-wave2 { opacity: .45; }
+.bm-light { fill: #f2b84b; }
+.bm-boat { transform-box: view-box; transform-origin: 59px 57px; animation: bm-bob 6s ease-in-out infinite; }
+.bm-reflect { transform-box: view-box; transform-origin: 59px 60px; animation: bm-shimmer 6s ease-in-out infinite; }
+.bm-wave { animation: bm-drift 9s linear infinite; }
+.bm-wave2 { animation-duration: 14s; animation-direction: reverse; }
+.bm-light { animation: bm-glow 3.6s ease-in-out infinite; }
+@keyframes bm-bob { 0%, 100% { transform: translateY(0) rotate(-1.2deg); } 50% { transform: translateY(1.2px) rotate(1.2deg); } }
+@keyframes bm-shimmer { 0%, 100% { transform: scaleX(1); opacity: 1; } 50% { transform: scaleX(.96); opacity: .7; } }
+@keyframes bm-drift { to { transform: translateX(30px); } }
+@keyframes bm-glow { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .bm-boat, .bm-reflect, .bm-wave, .bm-light { animation: none; }
+}
+.wordmark {
+  margin: 0; font-family: 'Fraunces', Georgia, 'Times New Roman', serif; font-weight: 600;
+  font-size: clamp(1.8rem, 4.2vw, 2.4rem); line-height: 1; letter-spacing: -.015em;
+}
+.tagline { margin: 5px 0 3px; color: var(--muted); font-size: .95rem; }
+.aid-note { font-size: .78rem; color: var(--muted); text-decoration: underline dotted; text-underline-offset: 3px; }
+.aid-note:hover { color: var(--fg); }
 .filters { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: end; margin-top: 10px; }
 
 /* Tidsväljare */
