@@ -88,19 +88,23 @@ class CoastIndex:
                 water += 1
         return land > water
 
-    def nearest_water(self, p, max_radius=500.0, margin=15.0):
-        """Flytta en punkt som ligger på land (t.ex. en brygga) till närmaste vatten.
+    def _clear_of_shore(self, q, clearance):
+        return all(self.first_hit(q, k * 30, clearance)[0] is None for k in range(12))
+
+    def nearest_water(self, p, max_radius=500.0, margin=15.0, clearance=15.0):
+        """Flytta en punkt som ligger på land eller precis i strandkanten (t.ex. en brygga eller en
+        badplats) till närmaste vatten som ligger minst `clearance` meter från stranden.
 
         Returnerar (punkt, flyttat avstånd i meter) eller (None, None) om inget vatten hittas.
         """
-        if not self.is_on_land(p):
+        if not self.is_on_land(p) and self._clear_of_shore(p, clearance):
             return p, 0.0
         r = 10.0
         while r <= max_radius:
             for k in range(24):
                 b = math.radians(k * 15)
                 q = (p[0] + math.sin(b) * (r + margin), p[1] + math.cos(b) * (r + margin))
-                if not self.is_on_land(q):
+                if not self.is_on_land(q) and self._clear_of_shore(q, clearance):
                     return q, r + margin
             r += 10.0
         return None, None

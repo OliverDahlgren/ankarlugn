@@ -42,8 +42,10 @@ h2 { font-size: 1rem; margin: 0 0 8px; }
 }
 form { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: end; }
 label { display: flex; flex-direction: column; font-size: 0.85rem; color: var(--muted); }
-input, button { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }
+input, button, select { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--card); color: var(--fg); }
 button { background: var(--accent); color: #fff; border: 0; cursor: pointer; }
+button.secondary { background: var(--card); color: var(--accent); border: 1px solid var(--accent); }
+button:disabled { opacity: 0.6; cursor: wait; }
 #status { margin: 6px 0 0; font-size: 0.85rem; color: var(--muted); min-height: 1.2em; }
 main { flex: 1; display: flex; min-height: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 #map { flex: 1; min-height: 360px; }

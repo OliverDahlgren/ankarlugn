@@ -17,6 +17,23 @@
       <label>Ankomst <input type="datetime-local" id="arrive" required></label>
       <label>Avfärd <input type="datetime-local" id="depart" required></label>
       <button type="submit">Visa lä</button>
+      <button type="button" id="near" class="secondary">Nära mig</button>
+      <label id="radius-label" hidden>Avstånd
+        <select id="radius">
+          <option value="5">inom 5 km</option>
+          <option value="10">inom 10 km</option>
+          <option value="20" selected>inom 20 km</option>
+          <option value="40">inom 40 km</option>
+          <option value="0">alla</option>
+        </select>
+      </label>
+      <label>Visa
+        <select id="kind">
+          <option value="alla">alla platser</option>
+          <option value="hamn">hamnar och naturhamnar</option>
+          <option value="bad">stränder och vikar</option>
+        </select>
+      </label>
     </form>
     <p id="status" role="status"></p>
   </header>

@@ -74,5 +74,12 @@ class TestFetch(unittest.TestCase):
         self.assertLess(moved, 100)
 
 
+    def test_nudge_from_waterline(self):
+        # En badplats som ligger exakt i strandkanten (x=0) flyttas ut minst 15 m från stranden.
+        p, moved = self.index.nearest_water((0.0, 500.0))
+        self.assertIsNotNone(p)
+        self.assertGreaterEqual(min(fetch_profile(self.index, p, 10, MAX, effective=False)), 15.0)
+
+
 if __name__ == "__main__":
     unittest.main()

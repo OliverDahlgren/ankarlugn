@@ -3,6 +3,7 @@
 Kör:  python3 scripts/build_profiles.py
 Data: © OpenStreetMap-bidragsgivare, ODbL. Rådata cachas i cache/ (ingår inte i repot).
 """
+import hashlib
 import json
 import math
 import os
@@ -22,6 +23,8 @@ ROOT = os.path.join(os.path.dirname(__file__), "..")
 CACHE = os.path.join(ROOT, "cache")
 STEP_DEG = 10
 MAX_FETCH = 20000.0
+# Område för kustlinjen (syd, väst, nord, öst): Stockholms skärgård med 20 km marginal.
+COAST_BBOX = (58.77, 17.929, 60.063, 19.715)
 ENDPOINTS = ["https://overpass-api.de/api/interpreter"]
 USER_AGENT = "ankarlugn/1.0 (+https://github.com/OliverDahlgren/ankarlugn)"
 
@@ -89,7 +92,8 @@ def read_places():
 def fetch_places(rows):
     kinds = {"n": "node", "w": "way", "r": "relation"}
     parts = "".join(f"{kinds[ref[0]]}({ref[1:]});" for ref, _ in rows)
-    data = cached("places.json", lambda: overpass(f"[out:json][timeout:120];({parts});out center tags;"))
+    key = hashlib.sha1(parts.encode()).hexdigest()[:10]
+    data = cached(f"places_{key}.json", lambda: overpass(f"[out:json][timeout:120];({parts});out center tags;"))
     by_ref = {f"{e['type'][0]}{e['id']}": e for e in data["elements"]}
     places = []
     for ref, name in rows:
@@ -97,7 +101,14 @@ def fetch_places(rows):
         lat = e.get("lat", e.get("center", {}).get("lat"))
         lon = e.get("lon", e.get("center", {}).get("lon"))
         tags = e.get("tags", {})
-        kind = "naturhamn" if tags.get("seamark:type") == "anchorage" else "gästhamn"
+        if tags.get("seamark:type") == "anchorage":
+            kind = "naturhamn"
+        elif tags.get("natural") == "beach":
+            kind = "strand"
+        elif tags.get("natural") == "bay":
+            kind = "vik"
+        else:
+            kind = "gästhamn"
         places.append({
             "id": ref, "name": name, "osm_name": tags.get("name", ""), "kind": kind,
             "osm_lat": lat, "osm_lon": lon,
@@ -146,10 +157,14 @@ def main():
     lats = [p["osm_lat"] for p in places]
     lons = [p["osm_lon"] for p in places]
     proj = Projector(sum(lats) / len(lats), sum(lons) / len(lons))
-    pad_lat = MAX_FETCH / 111000 + 0.02
+    pad_lat = MAX_FETCH / 111000
     pad_lon = pad_lat / math.cos(math.radians(proj.lat0))
+    s, w, n, e = COAST_BBOX
+    if min(lats) - pad_lat < s or max(lats) + pad_lat > n or min(lons) - pad_lon < w or max(lons) + pad_lon > e:
+        print("  VARNING: någon plats ligger nära kanten av COAST_BBOX; stryklängden kan bli för lång där",
+              file=sys.stderr)
     print("Hämtar kustlinje")
-    ways = fetch_coastline(min(lats) - pad_lat, min(lons) - pad_lon, max(lats) + pad_lat, max(lons) + pad_lon)
+    ways = fetch_coastline(*COAST_BBOX)
 
     segments = []
     for geom in ways.values():

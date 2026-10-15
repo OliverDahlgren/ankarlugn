@@ -19,7 +19,7 @@ const fmtHour = new Intl.DateTimeFormat('sv-SE', { weekday: 'short', hour: '2-di
 const fmtClock = new Intl.DateTimeFormat('sv-SE', { hour: '2-digit', timeZone: TZ });
 
 let profiles = null;
-let map, markers = {}, rayLayer;
+let map, markers = {}, rayLayer, myPos = null, myMarker = null, lastRun = null;
 const forecastCache = new Map();
 
 function compass(deg) {
@@ -207,32 +207,89 @@ async function evaluate(arrive, depart) {
     if (!a.worst || !b.worst) return (a.worst ? 0 : 1) - (b.worst ? 0 : 1);
     return LEVEL[a.worst.cls] - LEVEL[b.worst.cls] || a.worst.hs - b.worst.hs || a.worst.gust - b.worst.gust;
   });
+  lastRun = { results, arrive, depart };
+  render();
+}
 
+// Avstånd fågelvägen i km (haversine).
+function distanceKm(lat1, lon1, lat2, lon2) {
+  const r = Math.PI / 180;
+  const a = Math.sin((lat2 - lat1) * r / 2) ** 2 +
+    Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin((lon2 - lon1) * r / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(a));
+}
+
+const KIND_GROUPS = { hamn: ['gästhamn', 'naturhamn'], bad: ['strand', 'vik'] };
+
+function matchesFilters(place) {
+  const kind = document.getElementById('kind').value;
+  if (kind !== 'alla' && !KIND_GROUPS[kind].includes(place.kind)) return false;
+  const radius = Number(document.getElementById('radius').value);
+  if (myPos && radius && place.dist > radius) return false;
+  return true;
+}
+
+function render() {
+  if (!lastRun) return;
+  const { results, arrive, depart } = lastRun;
+  for (const r of results) {
+    r.place.dist = myPos ? distanceKm(myPos.lat, myPos.lon, r.place.lat, r.place.lon) : null;
+  }
+  const shown = results.filter(r => matchesFilters(r.place));
   const list = document.getElementById('ranking');
   list.innerHTML = '';
   for (const r of results) {
     const cls = r.worst ? r.worst.cls : 'grey';
     const why = r.error ? r.error : describe(r.place, r.hours, r.worst);
-    const html = `<span class="name">${r.place.name}</span> <span class="dot ${cls}"></span><br>
-      <span class="why">${r.place.kind}. ${why}</span>${r.hours.length ? timeline(r.hours) : ''}`;
-    const li = document.createElement('li');
-    li.innerHTML = html;
-    li.addEventListener('click', () => { map.setView([r.place.lat, r.place.lon], 13); markers[r.place.id].openPopup(); });
-    list.appendChild(li);
-
+    const dist = r.place.dist != null ? ` · ${r.place.dist.toFixed(1).replace('.', ',')} km` : '';
+    const visible = shown.includes(r);
     const m = markers[r.place.id];
-    m.setStyle({ fillColor: COLORS[cls] });
-    m.bindPopup(`<strong>${r.place.name}</strong> <span class="dot ${cls}"></span><br><span class="why">${r.place.kind}. ${why}</span>
+    m.setStyle({ fillColor: COLORS[cls], fillOpacity: visible ? 0.95 : 0.15, opacity: visible ? 1 : 0.3 });
+    m.bindPopup(`<strong>${r.place.name}</strong> <span class="dot ${cls}"></span><br><span class="why">${r.place.kind}${dist}. ${why}</span>
       ${r.hours.length ? timeline(r.hours) : ''}${roseSvg(r.place, r.hours)}`, { maxWidth: 300 });
+    if (!visible) continue;
+
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="name">${r.place.name}</span> <span class="dot ${cls}"></span><br>
+      <span class="why">${r.place.kind}${dist}. ${why}</span>${r.hours.length ? timeline(r.hours) : ''}`;
+    li.addEventListener('click', () => { map.setView([r.place.lat, r.place.lon], 13); m.openPopup(); });
+    list.appendChild(li);
   }
+  if (!shown.length) list.innerHTML = '<li class="why">Inga platser matchar filtret. Öka avståndet eller visa alla typer.</li>';
 
   const truncated = results.find(r => r.truncated);
   const failed = results.filter(r => r.error).length;
   setStatus([
-    `${results.length - failed} platser bedömda för ${fmtHour.format(arrive)} – ${fmtHour.format(depart)}.`,
+    `${shown.length} av ${results.length} platser visas, bedömda för ${fmtHour.format(arrive)} – ${fmtHour.format(depart)}.`,
+    myPos ? 'Avstånd räknas fågelvägen, inte sjövägen.' : '',
     truncated ? `Prognosen räcker bara till ${fmtHour.format(truncated.lastForecast)}; senare timmar ingår inte.` : '',
     failed ? `${failed} platser saknar prognos.` : '',
   ].filter(Boolean).join(' '));
+}
+
+function locate() {
+  const btn = document.getElementById('near');
+  if (!navigator.geolocation) { setStatus('Webbläsaren kan inte ge din position.'); return; }
+  btn.disabled = true;
+  btn.textContent = 'Söker position …';
+  navigator.geolocation.getCurrentPosition(pos => {
+    myPos = { lat: pos.coords.latitude, lon: pos.coords.longitude };
+    btn.disabled = false;
+    btn.textContent = 'Uppdatera position';
+    document.getElementById('radius-label').hidden = false;
+    if (myMarker) myMarker.remove();
+    myMarker = L.circleMarker([myPos.lat, myPos.lon], { radius: 7, color: '#fff', weight: 3, fillColor: '#2a7de1', fillOpacity: 1 })
+      .bindTooltip('Du är här').addTo(map);
+    render();
+    const radius = Number(document.getElementById('radius').value) || 20;
+    map.fitBounds(L.latLng(myPos.lat, myPos.lon).toBounds(radius * 2000));
+  }, err => {
+    btn.disabled = false;
+    btn.textContent = 'Nära mig';
+    setStatus(err.code === err.PERMISSION_DENIED
+      ? 'Du har inte gett sidan tillgång till din position. Tillåt plats i webbläsaren och försök igen.'
+      : 'Kunde inte hitta din position just nu.');
+  }, { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 });
 }
 
 function toLocalInput(d) {
@@ -273,6 +330,15 @@ async function init() {
     if (!(d > a)) { setStatus('Avfärden måste vara efter ankomsten.'); return; }
     evaluate(a, d);
   });
+  document.getElementById('near').addEventListener('click', locate);
+  document.getElementById('radius').addEventListener('change', () => {
+    render();
+    if (!myPos) return;
+    const radius = Number(document.getElementById('radius').value);
+    if (radius) map.fitBounds(L.latLng(myPos.lat, myPos.lon).toBounds(radius * 2000));
+    else map.fitBounds(L.latLngBounds(profiles.places.map(p => [p.lat, p.lon])).extend([myPos.lat, myPos.lon]), { padding: [20, 20] });
+  });
+  document.getElementById('kind').addEventListener('change', render);
   evaluate(arrive, depart);
 }
 

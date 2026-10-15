@@ -1,8 +1,8 @@
 # Ankarlugn
 
-Statisk webbsida som hjälper dig hitta natthamn eller ankringsplats med bäst lä i Stockholms skärgård.
+Statisk webbsida som hjälper dig hitta natthamn, ankringsplats eller badvik med bäst lä i Stockholms skärgård.
 Du anger ankomst och avfärd. Sidan visar hur skyddad varje plats är under **hela** vistelsen och
-rangordnar platserna efter den sämsta timmen.
+rangordnar platserna efter den sämsta timmen. Med *Nära mig* visas bara platser inom valt avstånd från dig.
 
 > **Endast ett hjälpmedel.** Ersätter inte sjökort, egen bedömning och gott sjömanskap.
 
