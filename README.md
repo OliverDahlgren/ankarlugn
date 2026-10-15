@@ -35,6 +35,13 @@ https://oliverdahlgren.github.io/ankarlugn/.
 
 SMHI:s API tillåter anrop direkt från webbläsaren, så sidan behöver ingen server eller GitHub Action.
 
+## Utan täckning och på hemskärmen
+
+Sidan har en service worker (`sw.js`). Den sparar sidan, dess data och de kartbitar och prognoser du senast
+tittat på, så att sidan öppnas även utan täckning. Sidan visar då hur gammal prognosen är. Den kan också läggas
+till på hemskärmen som en app (`manifest.webmanifest`). Höj versionsnumren (`?v=`) och `VERSION` i `sw.js`
+när filerna ändras; `tests/test_sw.py` kontrollerar att offline-listan stämmer.
+
 ## Loggning för framtida kalibrering
 
 GitHub Action `.github/workflows/logg.yml` körs fyra gånger per dygn. Den sparar SMHI:s prognosvind 48 h framåt

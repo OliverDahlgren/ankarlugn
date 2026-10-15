@@ -151,21 +151,33 @@ function describe(place, hours, worst) {
   return parts.join(' ');
 }
 
+const FORECAST_MAX_AGE_MS = 30 * 60 * 1000;   // hämta om prognosen om sidan stått öppen länge
+const STALE_FORECAST_MS = 3 * 3600 * 1000;      // äldre prognos än så: säg det tydligt
+
 async function loadForecast(place) {
   // SMHI:s rutnät är 2,5 km, så avrunda för att återanvända svar för närliggande platser.
   const key = `${place.lat.toFixed(2)},${place.lon.toFixed(2)}`;
-  if (!forecastCache.has(key)) {
-    forecastCache.set(key, fetch(SMHI_URL(place.lat, place.lon)).then(r => {
+  const cached = forecastCache.get(key);
+  if (!cached || Date.now() - cached.at > FORECAST_MAX_AGE_MS) {
+    const promise = fetch(SMHI_URL(place.lat, place.lon)).then(r => {
       if (!r.ok) throw new Error(`SMHI svarade ${r.status}`);
       return r.json();
-    }).then(j => j.timeSeries.map(s => ({
-      t: new Date(s.time),
-      dir: s.data.wind_from_direction,
-      wind: s.data.wind_speed,
-      gust: s.data.wind_speed_of_gust ?? s.data.wind_speed,
-    })).filter(s => s.dir != null && s.wind != null)));
+    }).then(j => {
+      const series = j.timeSeries.map(s => ({
+        t: new Date(s.time),
+        dir: s.data.wind_from_direction,
+        wind: s.data.wind_speed,
+        gust: s.data.wind_speed_of_gust ?? s.data.wind_speed,
+      })).filter(s => s.dir != null && s.wind != null);
+      // När prognosen gjordes. Utan täckning kommer svaret från sparad kopia och kan vara gammalt.
+      series.created = new Date(j.createdTime || j.referenceTime || Date.now());
+      return series;
+    });
+    // Misslyckade hämtningar ska inte fastna i minnet.
+    promise.catch(() => { if (forecastCache.get(key)?.promise === promise) forecastCache.delete(key); });
+    forecastCache.set(key, { at: Date.now(), promise });
   }
-  return forecastCache.get(key);
+  return forecastCache.get(key).promise;
 }
 
 // Prognosen per timme mellan ankomst och avfärd. Efter de första dygnen har SMHI glesare
@@ -206,8 +218,8 @@ function roseSvg(place, hours) {
 }
 
 function timeline(hours) {
-  return `<div class="timeline" title="Varje ruta är en timme">${hours.map(h =>
-    `<span class="${h.cls}" title="${fmtHour.format(h.t)}: ${compass(h.dir)} ${Math.round(h.wind)} (${Math.round(h.gust)}) m/s"></span>`).join('')}</div>`;
+  return `<span class="timeline" title="Varje ruta är en timme">${hours.map(h =>
+    `<span class="${h.cls}" title="${fmtHour.format(h.t)}: ${compass(h.dir)} ${Math.round(h.wind)} (${Math.round(h.gust)}) m/s"></span>`).join('')}</span>`;
 }
 
 function drawRays(place) {
@@ -238,7 +250,7 @@ async function evaluate(arrive, depart) {
       const worst = hours.reduce((a, b) =>
         LEVEL[b.cls] > LEVEL[a.cls] || (LEVEL[b.cls] === LEVEL[a.cls] && b.hs > a.hs) ? b : a);
       const lastForecast = series[series.length - 1].t;
-      return { place, hours, worst, truncated: depart > lastForecast, lastForecast };
+      return { place, hours, worst, truncated: depart > lastForecast, lastForecast, created: series.created };
     } catch (e) {
       return { place, hours: [], worst: null, error: e.message };
     }
@@ -294,9 +306,11 @@ function render() {
 
     const li = document.createElement('li');
     const swell = r.place.ferry_m != null && r.place.ferry_m < FERRY_NEAR_M ? ' <span class="badge" title="Linjetrafik nära">svall</span>' : '';
-    li.innerHTML = `<span class="name">${r.place.name}</span> <span class="dot ${cls}"></span>${swell}<br>
-      <span class="why">${r.place.kind}${dist}. ${why}</span>${r.hours.length ? timeline(r.hours) : ''}`;
-    li.addEventListener('click', () => { map.setView([r.place.lat, r.place.lon], 13); m.openPopup(); });
+    const label = { green: 'skyddat hela tiden', yellow: 'visst sjöhävning', red: 'utsatt', grey: 'ingen prognos' }[cls];
+    li.innerHTML = `<button type="button" class="place-btn" aria-label="${r.place.name}, ${label}. Visa på kartan">
+      <span class="name">${r.place.name}</span> <span class="dot ${cls}" aria-hidden="true"></span>${swell}<br>
+      <span class="why">${r.place.kind}${dist}. ${why}</span>${r.hours.length ? timeline(r.hours) : ''}</button>`;
+    li.querySelector('button').addEventListener('click', () => { map.setView([r.place.lat, r.place.lon], 13); m.openPopup(); });
     list.appendChild(li);
   }
   if (!shown.length) list.innerHTML = '<li class="why">Inga platser matchar filtret. Öka avståndet eller visa alla typer.</li>';
@@ -309,6 +323,24 @@ function render() {
     truncated ? `Prognosen räcker bara till ${fmtHour.format(truncated.lastForecast)}; senare timmar ingår inte.` : '',
     failed ? `${failed} platser saknar prognos.` : '',
   ].filter(Boolean).join(' '));
+  showForecastAge(results);
+}
+
+// Visar när prognosen gjordes, och varnar tydligt om den är gammal eller om täckning saknas.
+function showForecastAge(results) {
+  const created = results.map(r => r.created).filter(Boolean);
+  const el = document.getElementById('forecast-age');
+  if (!created.length) { el.hidden = true; return; }
+  const oldest = new Date(Math.min(...created));
+  const stale = Date.now() - oldest > STALE_FORECAST_MS;
+  const offline = navigator.onLine === false;
+  el.hidden = false;
+  el.classList.toggle('stale', stale || offline);
+  el.textContent = offline
+    ? `Ingen täckning: visar sparad prognos från ${fmtWhen.format(oldest)}.`
+    : stale
+      ? `Prognosen är från ${fmtWhen.format(oldest)} och kan vara inaktuell.`
+      : `SMHI-prognos från ${fmtWhen.format(oldest)}.`;
 }
 
 const ME_ICON = L.divIcon({ className: 'me-icon', html: '<span class="me-pulse"></span><span class="me-dot"></span>', iconSize: [22, 22] });
@@ -570,6 +602,13 @@ async function init() {
       .catch(() => {});
   }
   setStay(...PRESETS.tonight(), 'tonight');
+  window.addEventListener('online', () => { forecastCache.clear(); if (stay) evaluate(stay.arrive, stay.depart); });
+  window.addEventListener('offline', () => { if (lastRun) showForecastAge(lastRun.results); });
 }
 
 init().catch(e => setStatus(`Något gick fel: ${e.message}`));
+
+// Gör sidan användbar utan täckning (se sw.js).
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(() => {}));
+}

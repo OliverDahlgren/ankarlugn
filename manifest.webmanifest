@@ -1,0 +1,16 @@
+{
+  "name": "Ankarlugn – lä för natten i Stockholms skärgård",
+  "short_name": "Ankarlugn",
+  "description": "Hitta natthamn eller ankringsplats med bäst lä under hela tiden du ligger där.",
+  "lang": "sv",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f7f8f6",
+  "theme_color": "#163c56",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
