@@ -384,6 +384,12 @@ async function init() {
     else map.fitBounds(L.latLngBounds(profiles.places.map(p => [p.lat, p.lon])).extend([myPos.lat, myPos.lon]), { padding: [20, 20] });
   });
   document.getElementById('kind').addEventListener('change', render);
+  // Har du redan gett sidan tillgång till din position visas den blå pricken direkt.
+  if (navigator.permissions && navigator.geolocation) {
+    navigator.permissions.query({ name: 'geolocation' })
+      .then(st => { if (st.state === 'granted') locate(); })
+      .catch(() => {});
+  }
   evaluate(arrive, depart);
 }
 
